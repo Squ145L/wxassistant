@@ -634,7 +634,7 @@ class MainWindow:
             self.send_progress.set_status(f"发送中... {current}/{total}")
 
         elif msg_type == "__DONE__":
-            _, succ, fail, failed_list = msg
+            _, succ, fail, failed_list, all_results = msg
             total = succ + fail
             self._interrupt_poll_active = False
             self._stop_event = None
@@ -649,11 +649,15 @@ class MainWindow:
                 self.friend_list.mark_failed(failed_names)
             if not self._was_interrupted:
                 dialog = ResultDialog(self.root)
-                dialog.show_result(total, succ, fail, failed_list)
+                dialog.show_result(total, succ, fail, all_results)
             else:
                 dialog = ResultDialog(self.root)
                 dialog.title("发送结果 - 已中断")
-                dialog.show_result(total, succ, fail, failed_list)
+                dialog.show_result(total, succ, fail, all_results)
+            # 注入标签回调（选中联系人打标签后刷新主窗口）
+            if self._friend_service:
+                dialog.set_tag_callback(
+                    lambda name, tag: self._handle_set_tag(name, tag))
 
         elif msg_type == "__LOG__":
             _, text = msg

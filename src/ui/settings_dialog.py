@@ -1,6 +1,7 @@
 """设置弹窗"""
 
 import json
+import sys
 import threading
 import time
 import tkinter as tk
@@ -134,11 +135,18 @@ class SettingsDialog(tk.Toplevel):
         nb.add(tab3, text="坐标")
         self._build_coord_tab(tab3)
 
+        # ---- 标签4: 更新 ----
+        tab4 = ttk.Frame(nb, padding=16)
+        nb.add(tab4, text="更新")
+        self._build_update_tab(tab4)
+
         # 跳到指定标签
         if self._initial_tab == "OCR":
             nb.select(tab2)
         elif self._initial_tab == "坐标":
             nb.select(tab3)
+        elif self._initial_tab == "更新":
+            nb.select(tab4)
 
         # ---- 底部 ----
         btn_frame = ttk.Frame(self, padding=12)
@@ -360,6 +368,63 @@ class SettingsDialog(tk.Toplevel):
                 self.after(0, lambda: messagebox.showerror("测试失败", str(e)))
 
         threading.Thread(target=_do, daemon=True).start()
+
+    def _build_update_tab(self, parent: ttk.Frame) -> None:
+        """构建更新标签页"""
+        # 版本信息
+        ver_frame = ttk.Frame(parent)
+        ver_frame.pack(fill=tk.X)
+
+        ttk.Label(ver_frame, text="软件版本",
+                  font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W)
+
+        from update import get_local_version
+        local_ver = get_local_version()
+        self._version_label = ttk.Label(
+            ver_frame, text=f"当前版本：v{local_ver}",
+            font=("Microsoft YaHei", 10))
+        self._version_label.pack(anchor=tk.W, pady=(8, 4))
+
+        self._update_status = ttk.Label(
+            ver_frame, text="",
+            font=("Microsoft YaHei", 9), foreground="gray")
+        self._update_status.pack(anchor=tk.W)
+
+        ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=16)
+
+        # 检查更新按钮
+        ttk.Button(
+            parent, text="🔍 检查更新",
+            command=self._check_for_updates,
+        ).pack(pady=(0, 8))
+
+        ttk.Label(
+            parent,
+            text="检查 GitHub 上的最新版本并下载更新。\n"
+                 "更新会覆盖程序文件，保留 cache/ 和 logs/。\n"
+                 "更新完成后需重启程序。",
+            font=("", 9), foreground="gray", wraplength=380,
+        ).pack(anchor=tk.W)
+
+    def _check_for_updates(self):
+        """启动 update.py 子进程检查更新"""
+        import subprocess
+        import threading
+
+        self._update_status.config(text="正在启动更新检查...", foreground="gray")
+
+        def _run():
+            try:
+                update_script = Path(__file__).parent.parent.parent / "update.py"
+                subprocess.run(
+                    [sys.executable, str(update_script)],
+                    cwd=str(Path(__file__).parent.parent.parent),
+                )
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror(
+                    "更新失败", f"无法启动更新工具：{e}"))
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def _center(self, parent: tk.Widget) -> None:
         self.update_idletasks()

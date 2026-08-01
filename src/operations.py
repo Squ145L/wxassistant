@@ -103,7 +103,7 @@ def make_send_callback(bridge, template_engine, send_service):
         send_service.base_interval = interval
         batch = send_service.send_batch(friends=friends, send_one=send_one, on_progress=on_progress)
 
-        progress_queue.put(("__DONE__", batch.success, batch.failed, batch.failed_list))
+        progress_queue.put(("__DONE__", batch.success, batch.failed, batch.failed_list, batch.results))
         send_service.reset()
 
     return do_send

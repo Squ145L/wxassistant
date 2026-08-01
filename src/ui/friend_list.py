@@ -100,7 +100,7 @@ class FriendList(ttk.Frame):
         self._context_menu.add_command(label="重命名", command=self._rename_right_clicked)
         self._context_menu.add_command(label="设置标签", command=self._set_tag_right_clicked)
         self._context_menu.add_separator()
-        self._context_menu.add_command(label="删除", command=self._delete_friend)
+        self._context_menu.add_command(label="删除", command=self._delete_right_clicked)
         self._tree.bind("<Button-3>", self._on_right_click)
 
         self._tree.tag_configure("failed", foreground="red")
@@ -375,3 +375,12 @@ class FriendList(ttk.Frame):
         if messagebox.askyesno("确认删除", msg):
             if self._on_delete:
                 self._on_delete(names)
+
+    def _delete_right_clicked(self):
+        """右键删除：只删右键点击的那一个"""
+        if not self._right_click_iid:
+            return
+        name = self._right_click_iid
+        if messagebox.askyesno("确认删除", f"确认删除 '{name}'？\n(微信内不会删除)"):
+            if self._on_delete:
+                self._on_delete([name])

@@ -112,6 +112,10 @@ class FriendService:
         new_name = new_name.strip()
         if not new_name:
             return False
+        # 检查是否与其他好友重名
+        if any(f.name == new_name for f in self._friends if f.name != old_name):
+            logger.warning("重命名失败: '%s' → '%s' (名字已被占用)", old_name, new_name)
+            return False
         for f in self._friends:
             if f.name == old_name:
                 f.name = new_name
