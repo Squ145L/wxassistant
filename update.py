@@ -11,12 +11,13 @@ from tkinter import ttk, messagebox
 import os
 import sys
 import shutil
+import subprocess
 import tempfile
+import time
 import zipfile
 import threading
 from pathlib import Path
 from urllib.request import urlopen, Request
-from urllib.error import URLError
 
 GITHUB_REPO = "Squ145L/wxassistant"
 GITHUB_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main"
@@ -25,15 +26,6 @@ GITHUB_ZIP = f"https://github.com/{GITHUB_REPO}/archive/refs/heads/main.zip"
 APP_DIR = Path(__file__).parent.resolve()
 VERSION_PATH = APP_DIR / "version.txt"
 
-# 更新时跳过覆盖的文件/目录
-SKIP_NAMES = {
-    "cache", "logs", "__pycache__", ".git",
-    "version.txt",  # 保留本地版本号（更新后覆盖为新的）
-}
-
-# 但 version.txt 应该被更新... 让我重新考虑。
-# 实际上更新就是覆盖到最新版本，version.txt 也应该更新。
-# 只跳过用户运行时数据。
 SKIP_NAMES = {"cache", "logs", "__pycache__", ".git"}
 
 
@@ -43,7 +35,6 @@ SKIP_NAMES = {"cache", "logs", "__pycache__", ".git"}
 
 def parse_version(v: str) -> tuple:
     """'1.0.0' → (1, 0, 0)"""
-    # 去除 BOM 和不可见字符
     v = v.strip().lstrip("﻿").strip()
     parts = v.split(".")
     nums = []
@@ -68,13 +59,10 @@ def get_remote_version() -> str:
     url = f"{GITHUB_RAW}/version.txt"
     req = Request(url, headers={"User-Agent": "wxassistant-updater"})
     with urlopen(req, timeout=10) as resp:
-        text = resp.read().decode("utf-8")
-        # 去除可能的 BOM
-        return text.lstrip("﻿").strip()
+        return resp.read().decode("utf-8").lstrip("﻿").strip()
 
 
 def check_update() -> tuple[str, str, bool]:
-    """返回 (本地版本, 远程版本, 是否有更新)"""
     local = get_local_version()
     remote = get_remote_version()
     has_update = parse_version(remote) > parse_version(local)
@@ -95,12 +83,10 @@ class UpdateWindow(tk.Tk):
 
         self._local_ver = get_local_version()
         self._remote_ver = ""
-        self._download_thread = None
 
         self._build_ui()
         self._center()
 
-        # 自动开始检查
         self.after(300, self._start_check)
 
     def _build_ui(self):
@@ -111,7 +97,7 @@ class UpdateWindow(tk.Tk):
         ttk.Label(self._main, text="wxassistant 更新",
                   font=("Microsoft YaHei", 12, "bold")).pack(pady=(0, 12))
 
-        # 状态区
+        # 状态
         self._status_label = ttk.Label(
             self._main, text="正在检查更新...",
             font=("Microsoft YaHei", 10), wraplength=380)
@@ -119,26 +105,44 @@ class UpdateWindow(tk.Tk):
 
         # 版本信息
         self._version_frame = ttk.Frame(self._main)
-        self._version_frame.pack(fill=tk.X, pady=(0, 12))
+        self._version_frame.pack(fill=tk.X, pady=(0, 8))
 
         self._label_local = ttk.Label(
-            self._version_frame,
-            text=f"当前版本：v{self._local_ver}", font=("", 10))
+            self._version_frame, text=f"当前版本：v{self._local_ver}", font=("", 10))
         self._label_remote = ttk.Label(
             self._version_frame, text="", font=("", 10))
 
-        # 进度条
+        # 进度区域（初始隐藏）
         self._progress_frame = ttk.Frame(self._main)
+
         self._progress_var = tk.DoubleVar(value=0)
         self._progress_bar = ttk.Progressbar(
             self._progress_frame, variable=self._progress_var,
             mode="determinate", length=380)
+        self._progress_bar.pack(fill=tk.X, pady=(0, 4))
+
+        # 进度文字（速度 + 百分比）
         self._progress_label = ttk.Label(
             self._progress_frame, text="", font=("", 9), foreground="gray")
+        self._progress_label.pack(anchor=tk.W)
 
-        # 按钮区（ttk 风格与主界面一致）
+        # 当前文件/操作详情
+        self._detail_label = ttk.Label(
+            self._progress_frame, text="", font=("", 9), foreground="#555")
+        self._detail_label.pack(anchor=tk.W)
+
+        # 日志区：滚动显示最近操作
+        log_frame = ttk.Frame(self._progress_frame)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        self._log_text = tk.Text(
+            log_frame, height=5, width=52, font=("Consolas", 8),
+            state=tk.DISABLED, bg="#f8f8f8", relief=tk.FLAT,
+            borderwidth=1, padx=6, pady=4)
+        self._log_text.pack(fill=tk.BOTH, expand=True)
+
+        # 按钮区
         self._btn_frame = ttk.Frame(self._main)
-        self._btn_frame.pack(fill=tk.X, pady=(16, 0))
+        self._btn_frame.pack(fill=tk.X, pady=(12, 0))
         self._btn_close = ttk.Button(
             self._btn_frame, text="关闭", command=self.destroy)
         self._btn_close.pack(side=tk.RIGHT)
@@ -155,6 +159,7 @@ class UpdateWindow(tk.Tk):
         self._status_label.config(text="正在连接 GitHub...")
         self._label_local.pack_forget()
         self._label_remote.pack_forget()
+        self._progress_frame.pack_forget()
 
         def _check():
             try:
@@ -208,49 +213,63 @@ class UpdateWindow(tk.Tk):
         ):
             return
 
-        self._btn_action.config(state=tk.DISABLED, text="下载中...")
+        self._btn_action.pack_forget()
         self._btn_close.config(state=tk.DISABLED)
+
+        # 隐藏版本信息，显示进度区
+        self._label_local.pack_forget()
+        self._label_remote.pack_forget()
         self._status_label.config(
             text="正在下载更新...", foreground="black")
 
-        # 显示进度条
         self._progress_frame.pack(fill=tk.X, pady=(0, 8))
         self._progress_var.set(0)
-        self._progress_label.config(text="准备下载...")
+        self._progress_label.config(text="准备中...")
+        self._detail_label.config(text="")
+        self._clear_log()
 
         threading.Thread(target=self._do_update, daemon=True).start()
 
     def _do_update(self):
         try:
-            # 1. 下载 zip
-            self._update_progress(0, "正在下载...")
-
+            # 1. 下载
+            self._log("⬇ 开始下载主程序包...")
             tmp_dir = tempfile.mkdtemp(prefix="wxupdate_")
             zip_path = os.path.join(tmp_dir, "update.zip")
-
             self._download_with_progress(GITHUB_ZIP, zip_path)
 
             # 2. 解压
-            self._update_progress(95, "正在解压...")
+            self._update_progress(90, "正在解压...")
+            self._log("📦 正在解压...")
             extract_dir = os.path.join(tmp_dir, "extracted")
             os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(zip_path, "r") as zf:
-                zf.extractall(extract_dir)
+                file_list = [n for n in zf.namelist() if not n.endswith("/")]
+                total_files = len(file_list)
+                for i, name in enumerate(file_list):
+                    zf.extract(name, extract_dir)
+                    if i % 8 == 0 or i == total_files - 1:
+                        self._update_progress(
+                            90 + int((i + 1) / total_files * 5),
+                            f"解压中... {i + 1}/{total_files}")
+                        display = name.split("/", 1)[-1] if "/" in name else name
+                        self._detail(f"  {display}")
+            self._log(f"  解压完成 ({total_files} 个文件)")
 
-            # GitHub zip 内部有一层 wxassistant-main/ 目录
+            # 3. 找内部目录
             inner = os.path.join(extract_dir, "wxassistant-main")
             if not os.path.isdir(inner):
-                # 尝试找第一个子目录
                 dirs = [d for d in os.listdir(extract_dir)
                         if os.path.isdir(os.path.join(extract_dir, d))]
                 if dirs:
                     inner = os.path.join(extract_dir, dirs[0])
 
-            # 3. 覆盖文件
-            self._update_progress(97, "正在安装...")
+            # 4. 覆盖安装
+            self._update_progress(95, "正在安装...")
+            self._log("📋 正在安装文件...")
             self._replace_files(inner, str(APP_DIR))
 
-            # 4. 清理
+            # 5. 清理
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
             self.after(0, self._on_done)
@@ -258,14 +277,14 @@ class UpdateWindow(tk.Tk):
             self.after(0, lambda: self._on_error(str(e)))
 
     def _download_with_progress(self, url: str, dest: str):
-        """下载文件并更新进度条"""
-
         req = Request(url, headers={"User-Agent": "wxassistant-updater"})
-        resp = urlopen(req, timeout=60)
+        resp = urlopen(req, timeout=120)
         total = int(resp.headers.get("Content-Length", 0)) or -1
 
         downloaded = 0
-        chunk_size = 8192
+        chunk_size = 65536
+        start_time = time.time()
+        last_update = start_time
 
         with open(dest, "wb") as f:
             while True:
@@ -275,46 +294,88 @@ class UpdateWindow(tk.Tk):
                 f.write(chunk)
                 downloaded += len(chunk)
 
+                now = time.time()
+                if now - last_update < 0.15 and downloaded < total:
+                    continue  # 限制 UI 更新频率
+                last_update = now
+
+                elapsed = now - start_time
+                speed = downloaded / elapsed if elapsed > 0 else 0
+
                 if total > 0:
-                    pct = int(downloaded / total * 90)  # 0-90% 给下载
+                    pct = int(downloaded / total * 90)
                     mb_done = downloaded / (1024 * 1024)
                     mb_total = total / (1024 * 1024)
+                    # 速度格式化
+                    if speed > 1024 * 1024:
+                        speed_str = f"{speed / (1024 * 1024):.1f} MB/s"
+                    else:
+                        speed_str = f"{speed / 1024:.0f} KB/s"
                     self._update_progress(
-                        pct,
-                        f"下载中... {mb_done:.1f}MB / {mb_total:.1f}MB" if mb_total < 50
-                        else f"下载中... {mb_done:.1f}MB / {mb_total:.0f}MB",
-                    )
+                        pct, f"下载中... {mb_done:.1f} / {mb_total:.1f} MB  ({speed_str})")
                 else:
                     mb = downloaded / (1024 * 1024)
-                    self._update_progress(0, f"下载中... {mb:.1f}MB")
+                    self._update_progress(0, f"下载中... {mb:.1f} MB  (大小未知)")
 
     def _replace_files(self, src_dir: str, dst_dir: str):
-        """用新文件覆盖旧目录，跳过运行时数据"""
+        # 收集所有文件
+        all_files = []
         for root, dirs, files in os.walk(src_dir):
-            # 跳过特定目录
             dirs[:] = [d for d in dirs if d not in SKIP_NAMES]
-
-            rel = os.path.relpath(root, src_dir)
-            target_dir = os.path.join(dst_dir, rel) if rel != "." else dst_dir
-            os.makedirs(target_dir, exist_ok=True)
-
             for fname in files:
-                if fname in SKIP_NAMES:
-                    continue
-                src = os.path.join(root, fname)
-                dst = os.path.join(target_dir, fname)
-                shutil.copy2(src, dst)
+                if fname not in SKIP_NAMES:
+                    rel = os.path.relpath(os.path.join(root, fname), src_dir)
+                    all_files.append(rel)
+
+        total = len(all_files)
+        for i, rel in enumerate(all_files):
+            src = os.path.join(src_dir, rel)
+            dst = os.path.join(dst_dir, rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+
+            if i % 5 == 0 or i == total - 1:
+                pct = 95 + int((i + 1) / total * 5)
+                self._update_progress(pct, f"安装中... {i + 1}/{total}")
+                self._detail(f"  {rel}")
+
+        self._log(f"  安装完成 ({total} 个文件)")
+
+    # ================================================================
+    # 线程安全 UI 更新
+    # ================================================================
 
     def _update_progress(self, value: float, text: str = ""):
-        """线程安全更新进度（在主线程调用）"""
         def _set():
             self._progress_var.set(value)
             self._progress_label.config(text=text)
+        self._safe(_set)
 
+    def _detail(self, text: str):
+        def _set():
+            self._detail_label.config(text=text)
+        self._safe(_set)
+
+    def _log(self, text: str):
+        def _set():
+            self._log_text.config(state=tk.NORMAL)
+            self._log_text.insert(tk.END, text + "\n")
+            self._log_text.see(tk.END)
+            self._log_text.config(state=tk.DISABLED)
+        self._safe(_set)
+
+    def _clear_log(self):
+        def _set():
+            self._log_text.config(state=tk.NORMAL)
+            self._log_text.delete("1.0", tk.END)
+            self._log_text.config(state=tk.DISABLED)
+        self._safe(_set)
+
+    def _safe(self, fn):
         if threading.current_thread() is threading.main_thread():
-            _set()
+            fn()
         else:
-            self.after(0, _set)
+            self.after(0, fn)
 
     # ================================================================
     # 完成 / 错误
@@ -322,32 +383,46 @@ class UpdateWindow(tk.Tk):
 
     def _on_done(self):
         self._progress_var.set(100)
-        self._progress_label.config(text="")
+        self._progress_label.config(text="全部完成！")
+        self._detail_label.config(text="")
+        self._log("✅ 更新完成！请重启程序以使用新版本。")
         self._status_label.config(
-            text=f"✅ 更新完成！已更新到 v{self._remote_ver}\n请重启程序。",
+            text=f"✅ 已更新到 v{self._remote_ver}",
             foreground="#27ae60")
-        self._btn_action.config(
-            state=tk.NORMAL, text="关闭", command=self.destroy)
-        self._btn_close.pack_forget()
 
-        messagebox.showinfo("更新完成",
-                            f"已更新到 v{self._remote_ver}，请重启 wxassistant。",
-                            parent=self)
+        # 按钮：重启 + 关闭
+        self._btn_close.config(state=tk.NORMAL, text="关闭")
+        self._btn_action.config(
+            state=tk.NORMAL, text="🔄 重启程序",
+            command=self._restart_app)
+        self._btn_action.pack(side=tk.RIGHT, padx=(0, 10))
 
     def _on_error(self, error: str):
-        self._progress_frame.pack_forget()
+        self._log(f"❌ 更新失败: {error}")
         self._status_label.config(
             text=f"❌ 更新失败\n{error}", foreground="red")
         self._btn_action.config(
             state=tk.NORMAL, text="重试", command=self._confirm_update)
+        self._btn_action.pack(side=tk.RIGHT, padx=(0, 10))
         self._btn_close.config(state=tk.NORMAL)
+
+    def _restart_app(self):
+        """重启 wxassistant 主程序"""
+        main_py = APP_DIR / "main.py"
+        if main_py.exists():
+            subprocess.Popen(
+                [sys.executable, str(main_py)],
+                cwd=str(APP_DIR),
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+        self.destroy()
 
     # ================================================================
     # 工具
     # ================================================================
 
     def _center(self):
-        w, h = 440, 300
+        w, h = 460, 420
         self.update_idletasks()
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
@@ -362,7 +437,6 @@ class UpdateWindow(tk.Tk):
 
 def main():
     if "--check" in sys.argv:
-        # 命令行模式：仅输出版本信息
         try:
             local, remote, has = check_update()
             print(f"local={local}")
@@ -372,7 +446,6 @@ def main():
             print(f"error={e}", file=sys.stderr)
             sys.exit(1)
     else:
-        # GUI 模式
         win = UpdateWindow()
         win.mainloop()
 
