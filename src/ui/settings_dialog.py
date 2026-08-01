@@ -409,22 +409,21 @@ class SettingsDialog(tk.Toplevel):
     def _check_for_updates(self):
         """启动 update.py 子进程检查更新"""
         import subprocess
-        import threading
+        import os
 
-        self._update_status.config(text="正在启动更新检查...", foreground="gray")
-
-        def _run():
-            try:
-                update_script = Path(__file__).parent.parent.parent / "update.py"
-                subprocess.run(
-                    [sys.executable, str(update_script)],
-                    cwd=str(Path(__file__).parent.parent.parent),
-                )
-            except Exception as e:
-                self.after(0, lambda: messagebox.showerror(
-                    "更新失败", f"无法启动更新工具：{e}"))
-
-        threading.Thread(target=_run, daemon=True).start()
+        update_script = Path(__file__).parent.parent.parent / "update.py"
+        try:
+            subprocess.Popen(
+                [sys.executable, str(update_script)],
+                cwd=str(Path(__file__).parent.parent.parent),
+                creationflags=subprocess.CREATE_NO_WINDOW
+                if os.name == "nt" else 0,
+            )
+            self._update_status.config(
+                text="更新窗口已打开，请在弹出的窗口中操作。", foreground="gray")
+        except Exception as e:
+            self._update_status.config(
+                text=f"启动失败: {e}", foreground="red")
 
     def _center(self, parent: tk.Widget) -> None:
         self.update_idletasks()

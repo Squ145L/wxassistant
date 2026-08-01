@@ -43,13 +43,24 @@ SKIP_NAMES = {"cache", "logs", "__pycache__", ".git"}
 
 def parse_version(v: str) -> tuple:
     """'1.0.0' → (1, 0, 0)"""
-    parts = v.strip().split(".")
-    return tuple(int(p) for p in parts if p.isdigit())
+    # 去除 BOM 和不可见字符
+    v = v.strip().lstrip("﻿").strip()
+    parts = v.split(".")
+    nums = []
+    for p in parts:
+        p = p.strip().lstrip("﻿")
+        if not p:
+            continue
+        try:
+            nums.append(int(p))
+        except ValueError:
+            nums.append(0)
+    return tuple(nums) if nums else (0,)
 
 
 def get_local_version() -> str:
     if VERSION_PATH.exists():
-        return VERSION_PATH.read_text(encoding="utf-8").strip()
+        return VERSION_PATH.read_text(encoding="utf-8").lstrip("﻿").strip()
     return "0.0.0"
 
 
@@ -57,7 +68,9 @@ def get_remote_version() -> str:
     url = f"{GITHUB_RAW}/version.txt"
     req = Request(url, headers={"User-Agent": "wxassistant-updater"})
     with urlopen(req, timeout=10) as resp:
-        return resp.read().decode("utf-8").strip()
+        text = resp.read().decode("utf-8")
+        # 去除可能的 BOM
+        return text.lstrip("﻿").strip()
 
 
 def check_update() -> tuple[str, str, bool]:
@@ -72,21 +85,20 @@ def check_update() -> tuple[str, str, bool]:
 # 更新窗口
 # ================================================================
 
-class UpdateWindow(tk.Toplevel):
+class UpdateWindow(tk.Tk):
     """更新窗口：检查 → 确认 → 下载进度 → 完成"""
 
-    def __init__(self, parent: tk.Tk):
-        super().__init__(parent)
+    def __init__(self):
+        super().__init__()
         self.title("wxassistant 更新")
         self.resizable(False, False)
-        self.transient(parent)
 
         self._local_ver = get_local_version()
         self._remote_ver = ""
         self._download_thread = None
 
         self._build_ui()
-        self._center(parent)
+        self._center()
 
         # 自动开始检查
         self.after(300, self._start_check)
@@ -334,15 +346,13 @@ class UpdateWindow(tk.Toplevel):
     # 工具
     # ================================================================
 
-    def _center(self, parent: tk.Tk):
+    def _center(self):
         w, h = 440, 300
         self.update_idletasks()
-        pw = parent.winfo_width()
-        ph = parent.winfo_height()
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        x = px + (pw - w) // 2
-        y = py + (ph - h) // 2
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        x = (sw - w) // 2
+        y = (sh - h) // 2
         self.geometry(f"{w}x{h}+{x}+{y}")
 
 
@@ -363,17 +373,8 @@ def main():
             sys.exit(1)
     else:
         # GUI 模式
-        root = tk.Tk()
-        root.withdraw()  # 隐藏主窗口
-        try:
-            root.attributes("-topmost", True)
-        except Exception:
-            pass
-
-        # 先弹出一个小窗口显示状态
-        win = UpdateWindow(root)
-        win.grab_set()
-        root.mainloop()
+        win = UpdateWindow()
+        win.mainloop()
 
 
 if __name__ == "__main__":
