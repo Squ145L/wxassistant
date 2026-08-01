@@ -76,13 +76,14 @@ def check_update() -> tuple[str, str, bool]:
 class UpdateWindow(tk.Tk):
     """更新窗口：检查 → 确认 → 下载进度 → 完成"""
 
-    def __init__(self):
+    def __init__(self, parent_pid: int = 0):
         super().__init__()
         self.title("wxassistant 更新")
         self.resizable(False, False)
 
         self._local_ver = get_local_version()
         self._remote_ver = ""
+        self._parent_pid = parent_pid
 
         self._build_ui()
         self._center()
@@ -407,15 +408,46 @@ class UpdateWindow(tk.Tk):
         self._btn_close.config(state=tk.NORMAL)
 
     def _restart_app(self):
-        """重启 wxassistant 主程序"""
+        """关闭主程序 → 启动新主程序 → 关闭更新窗口"""
         main_py = APP_DIR / "main.py"
-        if main_py.exists():
+        if not main_py.exists():
+            messagebox.showerror("错误", f"找不到 main.py\n{main_py}", parent=self)
+            return
+
+        # 1. 关闭主窗口（按标题查找）
+        self._close_main_window()
+
+        # 2. 启动新主程序
+        try:
+            os.startfile(str(main_py))
+        except Exception:
             subprocess.Popen(
                 [sys.executable, str(main_py)],
                 cwd=str(APP_DIR),
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
+
+        # 3. 关闭更新窗口
         self.destroy()
+
+    @staticmethod
+    def _close_main_window():
+        """查找并关闭标题为'微信助手 - 群发工具'的窗口"""
+        try:
+            import win32gui
+            import win32con
+
+            def _enum(hwnd, _):
+                if not win32gui.IsWindowVisible(hwnd):
+                    return True
+                title = win32gui.GetWindowText(hwnd)
+                if "微信助手" in title and "群发工具" in title:
+                    win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                    return False  # 找到了就停
+                return True
+
+            win32gui.EnumWindows(_enum, None)
+        except ImportError:
+            pass  # 没有 pywin32 就跳过
 
     # ================================================================
     # 工具
@@ -446,7 +478,15 @@ def main():
             print(f"error={e}", file=sys.stderr)
             sys.exit(1)
     else:
-        win = UpdateWindow()
+        # 解析 --parent-pid（从设置页面启动时传入）
+        parent_pid = 0
+        try:
+            idx = sys.argv.index("--parent-pid")
+            parent_pid = int(sys.argv[idx + 1])
+        except (ValueError, IndexError):
+            pass
+
+        win = UpdateWindow(parent_pid=parent_pid)
         win.mainloop()
 
 

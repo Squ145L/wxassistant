@@ -414,7 +414,7 @@ class SettingsDialog(tk.Toplevel):
         update_script = Path(__file__).parent.parent.parent / "update.py"
         try:
             subprocess.Popen(
-                [sys.executable, str(update_script)],
+                [sys.executable, str(update_script), "--parent-pid", str(os.getpid())],
                 cwd=str(Path(__file__).parent.parent.parent),
                 creationflags=subprocess.CREATE_NO_WINDOW
                 if os.name == "nt" else 0,
