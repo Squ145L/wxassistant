@@ -62,7 +62,8 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, parent: tk.Widget, tab: str = "常规"):
         super().__init__(parent)
         self.title("设置")
-        self.resizable(False, False)
+        self.resizable(True, True)
+        self.minsize(460, 420)
         self.transient(parent)
         self._initial_tab = tab
         self.protocol("WM_DELETE_WINDOW", self._on_close)  # X 按钮也保存
@@ -307,7 +308,7 @@ class SettingsDialog(tk.Toplevel):
 
                 # 重新校准按钮（有帮助图片才显示）
                 if has_image_for(key):
-                    ttk.Button(row, text="重新校准", width=6,
+                    ttk.Button(row, text="重新校准",
                                command=lambda k=key: self._launch_coord_picker(k)).pack(side=tk.LEFT)
 
                 self._coord_vars[key] = (x_var, y_var)
