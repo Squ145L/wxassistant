@@ -441,6 +441,8 @@ class WeChatBridge:
         if self._should_stop(): return False
         logger.info("搜索联系人: '%s'", keyword)
         self.activate_window()
+        # 锁定主窗口句柄，防止搜索后浮层子窗口干扰坐标计算
+        main_hwnd = self._hwnd
         if self._should_stop(): return False
         self._send_keys('{Ctrl}f')
         time.sleep(0.03)
@@ -451,16 +453,18 @@ class WeChatBridge:
         time.sleep(SEARCH_DELAY)
         if self._should_stop(): return False
 
-        # 搜一搜独立窗口处理：搜索后、弹窗检测前点击独立窗口按钮
-        self._click_sousou_independent_btn()
+        self._click_sousou_independent_btn(main_hwnd)
 
         if self._close_search_popup():
             logger.info("搜索弹窗已关闭，联系人不存在: '%s'", keyword)
             return False
         return True
 
-    def _click_sousou_independent_btn(self):
-        """搜一搜独立窗口处理：点击独立窗口按钮（设置开关+坐标非零时生效）"""
+    def _click_sousou_independent_btn(self, main_hwnd: int = 0):
+        """搜一搜独立窗口处理：点击独立窗口按钮（设置开关+坐标非零时生效）
+
+        main_hwnd: 搜索前锁定的主窗口句柄，避免被浮层子窗口干扰。
+        """
         try:
             from src.ui.settings_dialog import load_settings
             settings = load_settings()
@@ -471,21 +475,25 @@ class WeChatBridge:
 
         from src.utils.coordinates import get_coord
         x_pct, y_pct = get_coord("sousou_independent_btn")
-        # (0, 0) = 未配置，跳过
         if x_pct == 0.0 and y_pct == 0.0:
             return
 
-        # 刷新窗口句柄（搜索后焦点可能变了）
-        self.find_window()
-        rect = self.get_window_rect()
-        if rect is None:
+        # 直接用传入的主窗口 hwnd，不调用任何 find_window 或属性
+        if not main_hwnd:
+            main_hwnd = self._hwnd
+        if not main_hwnd or not win32gui.IsWindow(main_hwnd):
             return
-
+        try:
+            rect = win32gui.GetWindowRect(main_hwnd)
+        except Exception:
+            return
         ww = rect[2] - rect[0]
         wh = rect[3] - rect[1]
+
         cx = rect[0] + int(ww * x_pct)
         cy = rect[1] + int(wh * y_pct)
-        logger.info("搜一搜独立窗口按钮: (%.4f, %.4f) → 屏幕 (%d, %d)", x_pct, y_pct, cx, cy)
+        logger.info("搜一搜独立窗口: hwnd=0x%X coord=(%.4f,%.4f) → 屏幕(%d,%d)",
+                    main_hwnd, x_pct, y_pct, cx, cy)
         self.click_at(cx, cy)
         time.sleep(0.3)
 
