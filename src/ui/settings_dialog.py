@@ -282,8 +282,8 @@ class SettingsDialog(tk.Toplevel):
                 row = ttk.Frame(scroll_frame)
                 row.pack(fill=tk.X, pady=1)
 
-                # 标签
-                ttk.Label(row, text=label_text, width=22, anchor=tk.W).pack(side=tk.LEFT)
+                # 标签（缩短宽度防止小屏被挤出）
+                ttk.Label(row, text=label_text, width=16, anchor=tk.W).pack(side=tk.LEFT)
 
                 # X%
                 ttk.Label(row, text="X:").pack(side=tk.LEFT)
@@ -489,15 +489,24 @@ class SettingsDialog(tk.Toplevel):
             ph = parent.winfo_height()
             px = parent.winfo_rootx()
             py = parent.winfo_rooty()
-            w, h = 500, 500
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+
+            # 自适应尺寸：不超过屏幕 90%
+            w = min(500, int(sw * 0.9))
+            h = min(540, int(sh * 0.9))
+
             if pw > 10 and ph > 10:
                 x = px + (pw - w) // 2
                 y = py + (ph - h) // 2
             else:
-                sw = self.winfo_screenwidth()
-                sh = self.winfo_screenheight()
                 x = (sw - w) // 2
                 y = (sh - h) // 2
+
+            # 边界检测：不超出屏幕
+            x = max(0, min(x, sw - w))
+            y = max(0, min(y, sh - h))
+
             self.geometry(f"{w}x{h}+{x}+{y}")
         except Exception:
-            pass  # 默认位置无所谓
+            pass
