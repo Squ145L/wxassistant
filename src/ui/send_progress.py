@@ -85,7 +85,7 @@ class SendProgress(ttk.Frame):
 
         self._log_text = tk.Text(
             log_frame,
-            height=4,
+            height=8,
             font=("Consolas", 9),
             wrap=tk.WORD,
             state=tk.DISABLED,

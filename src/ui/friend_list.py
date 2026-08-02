@@ -208,7 +208,7 @@ class FriendList(ttk.Frame):
             total = len(self._friends)
             self._label_count.config(text=f"已选 {self._selected_count}/{total} 人")
             self._select_all_var.set(self._selected_count == total)
-            # 显示层延迟批量刷新（避免 .item() 高频调用阻塞 Tk 重绘）
+            # 显示层延迟批量刷新
             if not self._dirty_rows:
                 self._tree.after_idle(self._flush_dirty_rows)
             self._dirty_rows.add(item)

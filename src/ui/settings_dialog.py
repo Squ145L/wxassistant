@@ -12,6 +12,7 @@ SETTINGS_PATH = Path("cache/settings.json")
 DEFAULT_SETTINGS = {
     "name_source": "cache",
     "ocr_debug_save": False,
+    "sousou_independent_enabled": False,
     "scan_page_count": 100,
     "scan_scroll_px": 1200,
     "scan_pages_per_scroll": 12,
@@ -63,13 +64,13 @@ class SettingsDialog(tk.Toplevel):
         self.title("设置")
         self.resizable(False, False)
         self.transient(parent)
-        self.grab_set()
         self._initial_tab = tab
         self.protocol("WM_DELETE_WINDOW", self._on_close)  # X 按钮也保存
 
         self._settings = load_settings()
         self._name_source = tk.StringVar(value=self._settings.get("name_source", "cache"))
         self._ocr_debug = tk.BooleanVar(value=self._settings.get("ocr_debug_save", False))
+        self._sousou_independent = tk.BooleanVar(value=self._settings.get("sousou_independent_enabled", False))
         self._logging_enabled = tk.BooleanVar(value=self._settings.get("logging_enabled", True))
         self._page_count = tk.IntVar(value=self._settings.get("scan_page_count", 10))
         self._scroll_px = tk.IntVar(value=self._settings.get("scan_scroll_px", 600))
@@ -91,6 +92,12 @@ class SettingsDialog(tk.Toplevel):
         ttk.Label(tab1, text="发送的 name 来源:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
         ttk.Radiobutton(tab1, text="缓存加载  (从 cache/friends.json 读取)", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(tab1, text="OCR 扫描  (扫描微信通讯录获取)", variable=self._name_source, value="ocr").pack(anchor=tk.W, pady=2)
+
+        ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+
+        ttk.Label(tab1, text="搜一搜:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Checkbutton(tab1, text="搜一搜独立窗口处理（搜索后弹窗前点击独立窗口按钮）",
+                        variable=self._sousou_independent).pack(anchor=tk.W)
 
         ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
 
@@ -156,6 +163,7 @@ class SettingsDialog(tk.Toplevel):
     def _on_close(self) -> None:
         self._settings["name_source"] = self._name_source.get()
         self._settings["ocr_debug_save"] = self._ocr_debug.get()
+        self._settings["sousou_independent_enabled"] = self._sousou_independent.get()
         self._settings["logging_enabled"] = self._logging_enabled.get()
         self._settings["scan_page_count"] = self._page_count.get()
         self._settings["scan_scroll_px"] = self._scroll_px.get()
@@ -171,7 +179,14 @@ class SettingsDialog(tk.Toplevel):
     def _on_clear_logs(self) -> None:
         from src.utils.logger import clear_logs
         clear_logs()
-        messagebox.showinfo("已清除", "日志文件已清空。")
+        # 同时清除扫描截图
+        import shutil
+        for d in ("cache/debug_scan", "cache/temp_scan"):
+            try:
+                shutil.rmtree(d, ignore_errors=True)
+            except Exception:
+                pass
+        messagebox.showinfo("已清除", "日志和扫描截图已清空。")
 
     def _run_test(self) -> None:
         def _do():
@@ -221,6 +236,12 @@ class SettingsDialog(tk.Toplevel):
             COORD_LABELS, COORD_GROUPS, DEFAULT_COORDINATES,
         )
 
+        # 提前导入，避免循环内异常导致整个标签页空白
+        try:
+            from src.ui.coord_picker import has_image_for
+        except Exception:
+            has_image_for = lambda _k: False
+
         self._all_coord_keys: list[str] = []
         coords = load_coordinates()
 
@@ -232,6 +253,15 @@ class SettingsDialog(tk.Toplevel):
         scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW)
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # 滚轮事件（函数定义，绑定移到控件创建完成后）
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _bind_mousewheel(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            for child in widget.winfo_children():
+                _bind_mousewheel(child)
 
         pct_vcmd = (parent.register(_validate_pct), "%P")
 
@@ -271,9 +301,17 @@ class SettingsDialog(tk.Toplevel):
 
                 # 测试点击按钮
                 ttk.Button(row, text="测试", width=4,
-                           command=lambda k=key: self._test_coord_click(k)).pack(side=tk.LEFT)
+                           command=lambda k=key: self._test_coord_click(k)).pack(side=tk.LEFT, padx=(0, 4))
+
+                # 重新校准按钮（有帮助图片才显示）
+                if has_image_for(key):
+                    ttk.Button(row, text="重新校准", width=7,
+                               command=lambda k=key: self._launch_coord_picker(k)).pack(side=tk.LEFT)
 
                 self._coord_vars[key] = (x_var, y_var)
+
+        # 所有控件创建完毕，绑定滚轮事件
+        _bind_mousewheel(scroll_frame)
 
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -369,6 +407,25 @@ class SettingsDialog(tk.Toplevel):
 
         threading.Thread(target=_do, daemon=True).start()
 
+    def _launch_coord_picker(self, key: str) -> None:
+        """打开坐标校准帮助器：缩略图 + 右键取点"""
+        from src.utils.coordinates import COORD_LABELS
+        from src.ui.coord_picker import CoordPicker, CM_KEYS
+
+        label = COORD_LABELS.get(key, key)
+
+        def on_save(coord_key: str, x: float, y: float) -> None:
+            xv, yv = self._coord_vars.get(coord_key, (None, None))
+            if xv is not None:
+                xv.set(f"{x:.4f}")
+            if yv is not None:
+                yv.set(f"{y:.4f}")
+            import logging
+            logging.getLogger(__name__).info(
+                "已保存 %s 坐标：(%.4f, %.4f)", label, x, y)
+
+        CoordPicker(self, key, label, on_save, is_cm=(key in CM_KEYS))
+
     def _build_update_tab(self, parent: ttk.Frame) -> None:
         """构建更新标签页"""
         # 版本信息
@@ -427,8 +484,20 @@ class SettingsDialog(tk.Toplevel):
 
     def _center(self, parent: tk.Widget) -> None:
         self.update_idletasks()
-        pw = parent.winfo_width(); ph = parent.winfo_height()
-        px = parent.winfo_rootx(); py = parent.winfo_rooty()
-        w, h = 460, 440
-        x = px + (pw - w) // 2; y = py + (ph - h) // 2
-        self.geometry(f"{w}x{h}+{x}+{y}")
+        try:
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            w, h = 500, 500
+            if pw > 10 and ph > 10:
+                x = px + (pw - w) // 2
+                y = py + (ph - h) // 2
+            else:
+                sw = self.winfo_screenwidth()
+                sh = self.winfo_screenheight()
+                x = (sw - w) // 2
+                y = (sh - h) // 2
+            self.geometry(f"{w}x{h}+{x}+{y}")
+        except Exception:
+            pass  # 默认位置无所谓

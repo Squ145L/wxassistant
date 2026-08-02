@@ -25,10 +25,32 @@ class ResultDialog(tk.Toplevel):
         self._on_set_tag: Optional[Callable[[str, str], bool]] = None
 
         self._build_ui()
+        self._center_on_parent(parent)
 
     def set_tag_callback(self, callback: Callable[[str, str], bool]):
         """注入标签回调，参数为 (name, tag) -> bool"""
         self._on_set_tag = callback
+
+    def _center_on_parent(self, parent: tk.Widget) -> None:
+        self.update_idletasks()
+        try:
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            w = self.winfo_reqwidth()
+            h = self.winfo_reqheight()
+            if pw > 10 and ph > 10:
+                x = px + (pw - w) // 2
+                y = py + (ph - h) // 2
+            else:
+                sw = self.winfo_screenwidth()
+                sh = self.winfo_screenheight()
+                x = (sw - w) // 2
+                y = (sh - h) // 2
+            self.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
 
     def _build_ui(self):
         frame = ttk.Frame(self, padding=16)
@@ -137,6 +159,9 @@ class ResultDialog(tk.Toplevel):
 
         self._select_all_var.set(
             all(not r.success for r in all_results) if all_results else False)
+
+        # 内容填充后重新居中
+        self._center_on_parent(self.master)
 
     # ================================================================
     # 按钮行为

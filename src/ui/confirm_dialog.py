@@ -73,6 +73,12 @@ class ConfirmDialog(tk.Toplevel):
 
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _bind_mousewheel(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            for child in widget.winfo_children():
+                _bind_mousewheel(child)
+
         canvas.bind("<MouseWheel>", _on_mousewheel)
         inner.bind("<MouseWheel>", _on_mousewheel)
 
@@ -85,6 +91,9 @@ class ConfirmDialog(tk.Toplevel):
             var.trace_add("write", _sync_select_all)
             self._check_vars.append(var)
             ttk.Checkbutton(inner, text=item, variable=var).pack(anchor=tk.W, pady=1)
+
+        # 子控件创建完毕，递归绑定滚轮
+        _bind_mousewheel(inner)
 
         # 底部按钮：确认 取消（右对齐，取消在右）
         btn_frame = ttk.Frame(frame)
@@ -104,7 +113,20 @@ class ConfirmDialog(tk.Toplevel):
 
     def _center(self, parent: tk.Widget) -> None:
         self.update_idletasks()
-        pw = parent.winfo_width(); ph = parent.winfo_height()
-        px = parent.winfo_rootx(); py = parent.winfo_rooty()
-        h = min(460, 200 + len(self._items) * 28)
-        self.geometry(f"420x{h}+{px + (pw - 420) // 2}+{py + (ph - h) // 2}")
+        try:
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            h = min(460, 200 + len(self._items) * 28)
+            if pw > 10 and ph > 10:
+                x = px + (pw - 420) // 2
+                y = py + (ph - h) // 2
+            else:
+                sw = self.winfo_screenwidth()
+                sh = self.winfo_screenheight()
+                x = (sw - 420) // 2
+                y = (sh - h) // 2
+            self.geometry(f"420x{h}+{x}+{y}")
+        except Exception:
+            pass

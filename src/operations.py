@@ -328,12 +328,12 @@ def make_search_contacts_callback(bridge, friend_service):
             # OCR 完成 → 关闭中断
             progress_queue.put(("__INTERRUPT_OFF__", None))
 
-            # OCR 调试截图：根据设置决定是否保留
+            # OCR 调试截图：根据设置决定是否保留一份副本
             from src.ui.settings_dialog import load_settings
             if load_settings().get("ocr_debug_save", False):
                 _save_debug_screenshots(paths, progress_queue)
-            else:
-                _cleanup_temp_scan(progress_queue)
+            # temp_scan 是临时目录，无论如何都清掉
+            _cleanup_temp_scan(progress_queue)
 
             # 阶段3: 弹确认窗
             if names:

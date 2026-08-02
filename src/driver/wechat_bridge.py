@@ -450,10 +450,44 @@ class WeChatBridge:
         self._paste_and_enter(keyword)
         time.sleep(SEARCH_DELAY)
         if self._should_stop(): return False
+
+        # 搜一搜独立窗口处理：搜索后、弹窗检测前点击独立窗口按钮
+        self._click_sousou_independent_btn()
+
         if self._close_search_popup():
             logger.info("搜索弹窗已关闭，联系人不存在: '%s'", keyword)
             return False
         return True
+
+    def _click_sousou_independent_btn(self):
+        """搜一搜独立窗口处理：点击独立窗口按钮（设置开关+坐标非零时生效）"""
+        try:
+            from src.ui.settings_dialog import load_settings
+            settings = load_settings()
+            if not settings.get("sousou_independent_enabled", False):
+                return
+        except Exception:
+            return
+
+        from src.utils.coordinates import get_coord
+        x_pct, y_pct = get_coord("sousou_independent_btn")
+        # (0, 0) = 未配置，跳过
+        if x_pct == 0.0 and y_pct == 0.0:
+            return
+
+        # 刷新窗口句柄（搜索后焦点可能变了）
+        self.find_window()
+        rect = self.get_window_rect()
+        if rect is None:
+            return
+
+        ww = rect[2] - rect[0]
+        wh = rect[3] - rect[1]
+        cx = rect[0] + int(ww * x_pct)
+        cy = rect[1] + int(wh * y_pct)
+        logger.info("搜一搜独立窗口按钮: (%.4f, %.4f) → 屏幕 (%d, %d)", x_pct, y_pct, cx, cy)
+        self.click_at(cx, cy)
+        time.sleep(0.3)
 
     def _close_search_popup(self) -> bool:
         """检测并关闭微信搜索弹窗
@@ -510,18 +544,29 @@ class WeChatBridge:
         cls = win32gui.GetClassName(popup_hwnd)
         logger.info("发现搜索弹窗: 0x%X '%s' cls=[%s]", popup_hwnd, title, cls)
 
-        for name, close_fn in [
-            ("WM_CLOSE", lambda: win32gui.PostMessage(popup_hwnd, win32con.WM_CLOSE, 0, 0)),
-            ("Alt+F4", lambda: uia.ControlFromHandle(popup_hwnd).SendKeys('%{F4}')),
-        ]:
-            try:
-                close_fn()
-            except Exception:
-                pass
-            time.sleep(0.05)
-            if not win32gui.IsWindow(popup_hwnd) or not win32gui.IsWindowVisible(popup_hwnd):
-                logger.info("弹窗已关闭 (%s)", name)
-                return True
+        # 策略1: WM_CLOSE（不模拟输入，安全）
+        try:
+            win32gui.PostMessage(popup_hwnd, win32con.WM_CLOSE, 0, 0)
+        except Exception:
+            pass
+        time.sleep(0.05)
+        if not win32gui.IsWindow(popup_hwnd) or not win32gui.IsWindowVisible(popup_hwnd):
+            logger.info("弹窗已关闭 (WM_CLOSE)")
+            return True
+
+        # 策略2: Alt+F4，通过 _send_keys 走钩子暂停路径
+        orig_hwnd = self._hwnd
+        try:
+            self._hwnd = popup_hwnd
+            self._send_keys('%{F4}')
+        except Exception:
+            pass
+        finally:
+            self._hwnd = orig_hwnd
+        time.sleep(0.05)
+        if not win32gui.IsWindow(popup_hwnd) or not win32gui.IsWindowVisible(popup_hwnd):
+            logger.info("弹窗已关闭 (Alt+F4)")
+            return True
 
         logger.warning("弹窗未关闭: 0x%X '%s' cls=[%s]", popup_hwnd, title, cls)
         return True

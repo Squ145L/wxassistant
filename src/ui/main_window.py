@@ -52,6 +52,9 @@ class MainWindow:
         set_ui_callback(self._on_log_message)
         logger.info("主窗口初始化完成")
 
+        # 输出 startup.txt 内容到日志窗口
+        self._show_startup_hints()
+
     # ================================================================
     # 回调注入
     # ================================================================
@@ -735,6 +738,22 @@ class MainWindow:
     def _on_log_message(self, text: str):
         if any(level in text for level in ("[INFO", "[WARNING", "[ERROR")):
             self._progress_queue.put(("__LOG__", text))
+
+    def _show_startup_hints(self):
+        """读取 startup.txt 并输出到日志窗口"""
+        hint_path = Path(__file__).resolve().parent.parent.parent / "startup.txt"
+        try:
+            if hint_path.exists():
+                text = hint_path.read_text(encoding="utf-8").strip()
+                if text:
+                    self.send_progress.append_log("── 启动提示 ──")
+                    for line in text.splitlines():
+                        line = line.strip()
+                        if line:
+                            self.send_progress.append_log(f"  {line}")
+                    self.send_progress.append_log("──────────────")
+        except Exception:
+            pass
 
     def run(self):
         self.root.mainloop()
