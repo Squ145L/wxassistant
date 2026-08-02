@@ -251,7 +251,9 @@ class SettingsDialog(tk.Toplevel):
         scroll_frame = ttk.Frame(canvas)
 
         scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW)
+        cw = canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW)
+        # scroll_frame 宽度跟随 canvas，防止右边内容被截断
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(cw, width=e.width))
         canvas.configure(yscrollcommand=scrollbar.set)
 
         # 滚轮事件（函数定义，绑定移到控件创建完成后）
@@ -288,24 +290,24 @@ class SettingsDialog(tk.Toplevel):
                 # X%
                 ttk.Label(row, text="X:").pack(side=tk.LEFT)
                 x_var = tk.StringVar(value=f"{cx:.4f}")
-                x_entry = ttk.Entry(row, textvariable=x_var, width=7,
+                x_entry = ttk.Entry(row, textvariable=x_var, width=6,
                                     validate="key", validatecommand=pct_vcmd)
-                x_entry.pack(side=tk.LEFT, padx=(0, 8))
+                x_entry.pack(side=tk.LEFT, padx=(0, 4))
 
                 # Y%
                 ttk.Label(row, text="Y:").pack(side=tk.LEFT)
                 y_var = tk.StringVar(value=f"{cy:.4f}")
-                y_entry = ttk.Entry(row, textvariable=y_var, width=7,
+                y_entry = ttk.Entry(row, textvariable=y_var, width=6,
                                     validate="key", validatecommand=pct_vcmd)
-                y_entry.pack(side=tk.LEFT, padx=(0, 6))
+                y_entry.pack(side=tk.LEFT, padx=(0, 4))
 
                 # 测试点击按钮
                 ttk.Button(row, text="测试", width=4,
-                           command=lambda k=key: self._test_coord_click(k)).pack(side=tk.LEFT, padx=(0, 4))
+                           command=lambda k=key: self._test_coord_click(k)).pack(side=tk.LEFT, padx=(0, 2))
 
                 # 重新校准按钮（有帮助图片才显示）
                 if has_image_for(key):
-                    ttk.Button(row, text="重新校准", width=7,
+                    ttk.Button(row, text="重新校准", width=6,
                                command=lambda k=key: self._launch_coord_picker(k)).pack(side=tk.LEFT)
 
                 self._coord_vars[key] = (x_var, y_var)
