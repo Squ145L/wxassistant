@@ -1,0 +1,34 @@
+# 运行时
+cache/
+logs/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 开发环境
+.venv/
+venv/
+.env
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# OCR 模型文件（太大，单独下载）
+OCR/models/*.onnx
+!OCR/models/.gitkeep
+
+# OMC agent state (sessions, tracking, replay)
+.omc/
+
+# Claude internal (hooks, settings, skills)
+.claude/
