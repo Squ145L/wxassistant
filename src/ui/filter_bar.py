@@ -23,6 +23,7 @@ class FilterBar(ttk.Frame):
         self._on_import_settings: Optional[Callable[[], None]] = None
         self._on_help: Optional[Callable[[], None]] = None
         self._on_refresh: Optional[Callable[[], None]] = None
+        self._on_multiopen: Optional[Callable[[], None]] = None
         self._on_tag_filter: Optional[Callable[[str], None]] = None
         self._on_batch_tag: Optional[Callable[[], None]] = None
         self._on_clear_tags: Optional[Callable[[], None]] = None
@@ -97,6 +98,11 @@ class FilterBar(ttk.Frame):
         )
         self._btn_refresh.pack(side=tk.LEFT)
 
+        self._btn_multiopen = ttk.Button(
+            row2, text="多开", width=6, command=self._on_multiopen_clicked,
+        )
+        self._btn_multiopen.pack(side=tk.LEFT, padx=(6, 0))
+
         # 右侧：标签筛选
         self._regex_hint = ttk.Label(row2, text="", foreground="#2196F3", font=("", 8))
         self._regex_hint.pack(side=tk.RIGHT)
@@ -146,6 +152,13 @@ class FilterBar(ttk.Frame):
 
     def set_on_clear_tags(self, callback: Callable[[], None]) -> None:
         self._on_clear_tags = callback
+
+    def set_on_multiopen(self, callback: Callable[[], None]) -> None:
+        self._on_multiopen = callback
+
+    def _on_multiopen_clicked(self) -> None:
+        if self._on_multiopen:
+            self._on_multiopen()
 
     def set_tag_options(self, tags: list[str]) -> None:
         cur = self._tag_var.get()
