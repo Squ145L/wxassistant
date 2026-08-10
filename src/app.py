@@ -117,6 +117,10 @@ def _build_window(multi_session=None):
 
         window = MainWindow()
         window.set_bridge(bridge)
+        bridge.set_hook_control(
+            window.suspend_interrupt_hook,
+            window.resume_interrupt_hook,
+        )
         window.set_friend_service(friend_service)
         window.set_send_callback(
             make_send_callback(lambda: bridge, template_engine, send_service))
@@ -134,6 +138,10 @@ def _build_window(multi_session=None):
     for acc in multi_session.accounts:
         b = WeChatBridge()
         b._hwnd = acc.hwnd  # 绑定该账户窗口（不重新 find_window）
+        b.set_hook_control(
+            window.suspend_interrupt_hook,
+            window.resume_interrupt_hook,
+        )
         fs = FriendService.for_account(acc.name)
         fs.load_cache()
         runtime[acc.name] = (b, fs)
