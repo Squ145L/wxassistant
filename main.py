@@ -38,7 +38,7 @@ def main():
     setup_logging()
 
     # 启动时应用用户日志开关设置
-    from src.ui.settings_dialog import load_settings
+    from src.utils.settings_store import load_settings
     if not load_settings().get("logging_enabled", True):
         from src.utils.logger import set_file_logging
         set_file_logging(False)

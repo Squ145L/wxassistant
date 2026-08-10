@@ -480,7 +480,7 @@ class WeChatBridge:
         main_hwnd: 搜索前锁定的主窗口句柄，避免被浮层子窗口干扰。
         """
         try:
-            from src.ui.settings_dialog import load_settings
+            from src.utils.settings_store import load_settings
             settings = load_settings()
             if not settings.get("sousou_independent_enabled", False):
                 return

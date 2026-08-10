@@ -203,7 +203,7 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
         time.sleep(0.3)
         bridge._hwnd = main_hwnd
 
-    from src.ui.settings_dialog import load_scan_settings
+    from src.utils.settings_store import load_scan_settings
     scan = load_scan_settings()
     page_count = scan["page_count"]
     scroll_px = scan["scroll_px"]
@@ -332,7 +332,7 @@ def make_search_contacts_callback(get_bridge, friend_service):
             progress_queue.put(("__INTERRUPT_OFF__", None))
 
             # OCR 调试截图：根据设置决定是否保留一份副本
-            from src.ui.settings_dialog import load_settings
+            from src.utils.settings_store import load_settings
             if load_settings().get("ocr_debug_save", False):
                 _save_debug_screenshots(paths, progress_queue)
             # temp_scan 是临时目录，无论如何都清掉
