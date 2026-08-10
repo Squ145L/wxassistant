@@ -11,7 +11,9 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Optional, Callable
 
-from src.utils.config import WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, LEFT_PANEL_WIDTH
+from src.utils.config import (
+    WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, LEFT_PANEL_WIDTH, LEFT_MIN_PANEL_WIDTH,
+)
 from src.utils.coordinates import get_coord
 from src.utils.logger import set_ui_callback
 from src.ui.filter_bar import FilterBar
@@ -152,11 +154,12 @@ class MainWindow:
         self.send_progress.pack(fill=tk.X, side=tk.BOTTOM, padx=6, pady=(0, 6))
 
         # 主区域
-        main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        # 用经典 tk.PanedWindow（支持 pane minsize，限制联系人面板最小宽度）
+        main_paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6, 0))
 
         left = ttk.Frame(main_paned, width=LEFT_PANEL_WIDTH)
-        main_paned.add(left, weight=0)
+        main_paned.add(left, minsize=LEFT_MIN_PANEL_WIDTH)
 
         self.filter_bar = FilterBar(left)
         self.filter_bar.pack(fill=tk.X)
@@ -166,7 +169,7 @@ class MainWindow:
         self.friend_list.pack(fill=tk.BOTH, expand=True)
 
         right = ttk.Frame(main_paned)
-        main_paned.add(right, weight=1)
+        main_paned.add(right, minsize=360)
 
         self.message_editor = MessageEditor(right)
         self.message_editor.pack(fill=tk.BOTH, expand=True)
