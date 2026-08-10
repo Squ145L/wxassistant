@@ -225,3 +225,50 @@ foreground_lock = threading.Lock()
 - **重叠**：叠放窗口被拦截提示；平铺通过
 - **校准**：全局继承 → 改一值变专属 → 另一账户不受影响
 - **压测**：5 开各 20 人，监控每账户完成时间和总体吞吐
+
+---
+
+## 12. 实施状态（2026-08-10 更新）
+
+本文档写于设计阶段；实际实现沿用了核心架构并大幅扩展（用户需求审问第 2 轮追加 17 项）。以下记录差异与完成情况，供后续继续。
+
+**分支**：`feature/multi-account-phase1`，27 个 commit。pytest 32 个全过。
+
+### 已完成
+
+**阶段 1（原计划，按 `docs/superpowers/plans/2026-08-10-multi-account-phase1.md` 全部交付）**
+- `find_all_windows()` + `find_window()` 复用
+- 多开引导窗口（前台确认法）、`MultiAccountSession`、每账户名单 `FriendService.for_account`
+- app.py 单/多账户启动路径、`operations` 改 `get_bridge` callable
+
+**批 1 — 正确性**
+- 弹窗检测排除已锁定账户窗口（`bridge.set_excluded_windows`，修复多开误关另一账户主界面）
+- `[多开]` ↔ `[单用户模式]` 切换
+- 设置→多开 延迟页（`multi_open_*` 参数；**读取在阶段 2 启用**）
+
+**批 2 — 账户级设置**
+- `coordinates.load/save/get_coord(account_name)`：账户文件回退全局
+- bridge 带 `account_name`，聊天标题校准/点击坐标/通讯录扫描按账户读取
+- 设置弹窗账户下拉（保存当前 → 重开对应账户），坐标/OCR 读写当前账户；单账户显示"全局"
+- 不可跨账户多选（切账户清勾选）、群发前提示校准
+- `calibrate_ocr.py` 支持 `--account`（账户专属校准文件）
+
+**批 3 — UI 重构**
+- 顶栏 `TopBar`：账户 / `[联系人▾]`(检查、导出、扫描、搜索导入) / `[标签▾]` / 刷新 / 设置 / 帮助 / 多开
+- `FilterBar` 单行精简（搜索/正则/标签筛选/匹配计数）
+- 导出 `src/services/export_service.py`（txt/csv/json，文件名带账户+时间戳）
+- OCR 校准移入 设置→OCR（两个按钮）
+- 好友列表按钮（➕/反选/红字删除）、窗口 1100×720、左面板 `pane minsize` 防拖窄
+
+**后续修复（实际使用反馈）**
+- 恢复 `set_hook_control` 注入（app 重构回归：模拟输入不再误触发中断）
+- 顶栏按钮 command 改为**运行时读取回调**（修复按钮无反应）
+- 设置持久化抽到纯层 `src/utils/settings_store.py`（消除 driver/operations → ui 反向依赖）
+- 反选按钮宽度（中文 2 倍字符宽）、删除按钮 ttk 样式、搜索框固定 ~10 汉字
+
+### 未完成 / 待办
+- **阶段 2：流水线并发发送**（每账户线程 + 全局前台锁 + OCR 后台并行）——下一目标
+- 端到端手工验证（真实微信多开：引导、名单隔离、切窗发送、弹窗过滤）
+- 账户专属校准工具的完整验证（`calibrate_ocr.py --account` 需真实多开确认）
+- `LEFT_PANEL_WIDTH`/`LEFT_MIN_PANEL_WIDTH` 当前 200/380（min 覆盖初始，待用户定稿语义）
+- UI 视觉微调可能还有后续（用户反馈驱动）
