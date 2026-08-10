@@ -67,6 +67,7 @@ class WeChatBridge:
         self._hook_suspend = None
         self._hook_resume = None
         self._excluded_hwnds: set[int] = set()
+        self._account_name: Optional[str] = None
 
     def set_stop_check(self, checker):
         self._stop_check = checker
@@ -79,6 +80,14 @@ class WeChatBridge:
     def set_excluded_windows(self, hwnds):
         """多账户：排除其他账户的主窗口，防止弹窗检测误关它们"""
         self._excluded_hwnds = set(hwnds)
+
+    def set_account_name(self, name: Optional[str]):
+        """设置当前账户名（多账户：坐标/OCR 校准按账户读取）"""
+        self._account_name = name
+
+    @property
+    def account_name(self) -> Optional[str]:
+        return self._account_name
 
     def _should_stop(self) -> bool:
         if self._stop_check:
@@ -329,21 +338,29 @@ class WeChatBridge:
             result = result.replace(src, dst)
         return result
 
+    def _calibration_path(self) -> Path:
+        """账户专属校准文件（该账户单独校准过），否则全局校准文件"""
+        if self._account_name:
+            from src.utils.account_paths import calibration_path_for
+            return calibration_path_for(self._account_name)
+        return OCR_CALIBRATION_PATH
+
     def _get_chat_title_rect(self) -> Optional[Tuple[int, int, int, int]]:
         """获取聊天标题区域的屏幕坐标（按校准参数从窗口推算）"""
         rect = self.get_window_rect()
         if rect is None:
             return None
 
-        # 加载校准参数
+        # 加载校准参数（账户专属优先，回退全局）
         calib = dict(DEFAULT_CHAT_TITLE_CALIB)
-        if OCR_CALIBRATION_PATH.exists():
+        path = self._calibration_path()
+        if path.exists():
             try:
-                data = json.loads(OCR_CALIBRATION_PATH.read_text(encoding="utf-8"))
+                data = json.loads(path.read_text(encoding="utf-8"))
                 if "chat_title" in data:
                     calib.update(data["chat_title"])
             except Exception:
-                logger.warning("OCR 校准文件读取失败，使用默认值")
+                logger.warning("OCR 校准文件读取失败，使用默认值: %s", path)
 
         result = resolve_calibration_rect(calib, rect)
         logger.debug("聊天标题区域: (%d,%d)-(%d,%d)", *result)
@@ -471,7 +488,7 @@ class WeChatBridge:
             return
 
         from src.utils.coordinates import get_coord
-        x_pct, y_pct = get_coord("sousou_independent_btn")
+        x_pct, y_pct = get_coord("sousou_independent_btn", self._account_name)
         if x_pct == 0.0 and y_pct == 0.0:
             return
 
@@ -623,13 +640,13 @@ class WeChatBridge:
         ww = rect[2] - rect[0]
         wh = rect[3] - rect[1]
         # 先把光标移到窗口中间偏下（安全区，不会点到折叠按钮）
-        safe_x_pct, safe_y_pct = get_coord("safe_zone")
+        safe_x_pct, safe_y_pct = get_coord("safe_zone", self._account_name)
         safe_x = rect[0] + int(ww * safe_x_pct)
         safe_y = rect[1] + int(wh * safe_y_pct)
         self.click_at(safe_x, safe_y)
         time.sleep(0.15)
         # 再点通讯录标签
-        cx_pct, cy_pct = get_coord("tab_contacts")
+        cx_pct, cy_pct = get_coord("tab_contacts", self._account_name)
         cx = rect[0] + int(ww * cx_pct)
         cy = rect[1] + int(wh * cy_pct)
         self.click_at(cx, cy)
@@ -645,7 +662,7 @@ class WeChatBridge:
             return None
         ww = rect[2] - rect[0]
         wh = rect[3] - rect[1]
-        cx_pct, cy_pct = get_coord("btn_contacts_mgr")
+        cx_pct, cy_pct = get_coord("btn_contacts_mgr", self._account_name)
         cx = rect[0] + int(ww * cx_pct)
         cy = rect[1] + int(wh * cy_pct)
         logger.info("点击通讯录管理: (%d,%d)", cx, cy)

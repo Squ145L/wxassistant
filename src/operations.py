@@ -175,7 +175,7 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
 
     rect = win32gui.GetWindowRect(hwnd)
     if rect:
-        cx_pct, cy_pct = get_coord("cm_list_focus")
+        cx_pct, cy_pct = get_coord("cm_list_focus", bridge.account_name)
         fx = rect[0] + int((rect[2] - rect[0]) * cx_pct)
         fy = rect[1] + int((rect[3] - rect[1]) * cy_pct)
         bridge.click_at(fx, fy)
@@ -187,7 +187,7 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
     time.sleep(0.3)
 
     if keyword and rect:
-        sx_pct, sy_pct = get_coord("cm_search_box")
+        sx_pct, sy_pct = get_coord("cm_search_box", bridge.account_name)
         sx = rect[0] + int((rect[2] - rect[0]) * sx_pct)
         sy = rect[1] + int((rect[3] - rect[1]) * sy_pct)
         bridge.click_at(sx, sy)
@@ -209,7 +209,7 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
     scroll_px = scan["scroll_px"]
     scroll_times = scan.get("pages_per_scroll", 1)  # 每页滚几次
 
-    calib = _load_calibration("contacts_list")
+    calib = _load_calibration("contacts_list", bridge.account_name)
     rect = win32gui.GetWindowRect(hwnd)
     left, top, right, bottom = rect
     ww, wh = right - left, bottom - top
@@ -356,12 +356,15 @@ def make_search_contacts_callback(get_bridge, friend_service):
 # 工具
 # ================================================================
 
-def _load_calibration(key: str) -> dict:
-    """从 cache/ocr_calibration.json 加载校准参数"""
+def _load_calibration(key: str, account_name: Optional[str] = None) -> dict:
+    """从校准文件加载参数（账户专属优先，回退全局）"""
     # 用 wechat_bridge 的默认值作为 fallback（已是百分比格式）
     from src.driver.wechat_bridge import DEFAULT_CHAT_TITLE_CALIB
     calib = dict(DEFAULT_CHAT_TITLE_CALIB)
     config_path = Path("cache/ocr_calibration.json")
+    if account_name:
+        from src.utils.account_paths import calibration_path_for
+        config_path = calibration_path_for(account_name)
     if config_path.exists():
         try:
             data = json.loads(config_path.read_text(encoding="utf-8"))

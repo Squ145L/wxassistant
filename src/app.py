@@ -145,6 +145,7 @@ def _build_window(multi_session=None):
         )
         # 排除其他账户窗口，防止弹窗检测把别的账户主界面当"搜一搜"关掉
         b.set_excluded_windows(all_hwnds - {acc.hwnd})
+        b.set_account_name(acc.name)  # 坐标/OCR 校准按账户读取
         fs = FriendService.for_account(acc.name)
         fs.load_cache()
         runtime[acc.name] = (b, fs)
