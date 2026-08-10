@@ -114,12 +114,13 @@ class MainWindow:
         return self._friend_service
 
     def _switch_account(self, name: str) -> None:
-        """切换到指定账户：换 bridge + friend_service"""
+        """切换到指定账户：换 bridge + friend_service（不可跨账户多选，清空勾选）"""
         if name not in self._account_runtime:
             return
         bridge, service = self._account_runtime[name]
         self.set_bridge(bridge)
         self.set_friend_service(service)
+        self.friend_list.select_none()
 
     # ================================================================
     # UI 构建
@@ -557,6 +558,32 @@ class MainWindow:
             "建议平铺窗口后重新进入多开。\n是否仍然继续？",
         )
 
+    def _current_calibration_path(self) -> Path:
+        """当前账户（或全局）的 OCR 校准文件路径"""
+        acct = self._current_account_name()
+        if acct:
+            from src.utils.account_paths import calibration_path_for
+            return calibration_path_for(acct)
+        return Path("cache/ocr_calibration.json")
+
+    def _check_calibration(self) -> bool:
+        """发送前检查是否做过聊天标题校准，未校准则提示。返回 True=可继续"""
+        path = self._current_calibration_path()
+        calibrated = False
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                calibrated = bool(data.get("chat_title"))
+            except Exception:
+                pass
+        if calibrated:
+            return True
+        return messagebox.askyesno(
+            "提示",
+            "尚未校准聊天标题 OCR 区域，群发时可能无法正确验证发送对象。\n"
+            "建议先在 [OCR] → [OCR校准] 聊天界面标题 完成校准。\n\n是否仍然继续？",
+        )
+
     def _on_start_send(self):
         selected = self.friend_list.get_selected()
         if not selected:
@@ -570,6 +597,10 @@ class MainWindow:
 
         # 多账户模式：发送前检测窗口重叠（防止切窗操作点错窗口）
         if not self._check_window_overlap():
+            return
+
+        # 发送前检查 OCR 校准（未校准会干扰发送对象验证）
+        if not self._check_calibration():
             return
 
         attachments = self.message_editor.get_attachments()
