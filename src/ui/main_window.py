@@ -41,12 +41,15 @@ class MainWindow:
         self._on_check_names: Optional[Callable] = None
         self._on_search_contacts: Optional[Callable] = None
         self._on_enter_multiopen: Optional[Callable] = None
+        self._on_exit_multiopen: Optional[Callable] = None
         self._progress_queue: queue.Queue = queue.Queue()
         self._stop_event: Optional[threading.Event] = None
         self._interrupt_poll_active: bool = False
 
         self._build_ui()
         self._wire_events()
+        if self._multi_session is not None:
+            self.filter_bar.set_multiopen_label(True)
         self._poll_progress_queue()
 
         # 任意键/鼠标点击中断（仅在操作进行中生效）
@@ -82,6 +85,9 @@ class MainWindow:
 
     def set_enter_multiopen_callback(self, callback: Callable) -> None:
         self._on_enter_multiopen = callback
+
+    def set_exit_multiopen_callback(self, callback: Callable) -> None:
+        self._on_exit_multiopen = callback
 
     def set_account_runtime(self, runtime: dict) -> None:
         """注入多账户运行时：{账户名: (bridge, friend_service)}"""
@@ -346,8 +352,12 @@ class MainWindow:
             self._switch_account(self._account_var.get())
 
     def _on_multiopen_clicked(self) -> None:
-        if self._on_enter_multiopen:
-            self._on_enter_multiopen()
+        if self._multi_session is not None:
+            if self._on_exit_multiopen:
+                self._on_exit_multiopen()
+        else:
+            if self._on_enter_multiopen:
+                self._on_enter_multiopen()
 
     def _on_refresh(self) -> None:
         """刷新按钮：清除所有红色标记 + 重新连接微信窗口"""

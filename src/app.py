@@ -157,6 +157,7 @@ def _build_window(multi_session=None):
     window.set_search_contacts_callback(
         make_search_contacts_callback(window.get_current_bridge, window.get_current_friend_service))
     window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))
+    window.set_exit_multiopen_callback(lambda w=window: _exit_multiopen(w))
     return window
 
 
@@ -171,3 +172,9 @@ def _enter_multiopen(window) -> None:
         run_gui()  # 取消 → 回单账户模式
     else:
         run_multi_gui(session)
+
+
+def _exit_multiopen(window) -> None:
+    """点 [单用户模式]：退出多开，回到单账户模式"""
+    window.root.destroy()
+    run_gui()

@@ -156,6 +156,10 @@ class FilterBar(ttk.Frame):
     def set_on_multiopen(self, callback: Callable[[], None]) -> None:
         self._on_multiopen = callback
 
+    def set_multiopen_label(self, is_multi: bool) -> None:
+        """多开模式下按钮显示 [单用户模式]，单账户显示 [多开]"""
+        self._btn_multiopen.config(text="单用户模式" if is_multi else "多开")
+
     def _on_multiopen_clicked(self) -> None:
         if self._on_multiopen:
             self._on_multiopen()
