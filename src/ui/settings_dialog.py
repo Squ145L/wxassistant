@@ -17,6 +17,13 @@ DEFAULT_SETTINGS = {
     "scan_scroll_px": 1200,
     "scan_pages_per_scroll": 12,
     "logging_enabled": True,
+    # ---- 多开（流水线并发发送的时序参数，阶段2 启用读取）----
+    "multi_open_activate_delay": 0.2,       # 窗口激活后等待 (s)
+    "multi_open_search_delay": 0.1,         # 搜索 Enter 后、弹窗检测前 (s)
+    "multi_open_ready_timeout": 2.0,        # 切回后等待窗口就绪超时 (s)
+    "multi_open_account_interval": 3.0,     # 两个账户最后一步之间 (s)
+    "multi_open_send_interval": 0.1,        # 发送基础间隔 (s)
+    "multi_open_popup_retry": 0,            # 弹窗检测重试次数
 }
 
 # 浮点数百分比校验
@@ -75,6 +82,13 @@ class SettingsDialog(tk.Toplevel):
         self._logging_enabled = tk.BooleanVar(value=self._settings.get("logging_enabled", True))
         self._page_count = tk.IntVar(value=self._settings.get("scan_page_count", 10))
         self._scroll_px = tk.IntVar(value=self._settings.get("scan_scroll_px", 600))
+        # 多开延迟参数
+        self._mo_activate = tk.DoubleVar(value=self._settings.get("multi_open_activate_delay", 0.2))
+        self._mo_search = tk.DoubleVar(value=self._settings.get("multi_open_search_delay", 0.1))
+        self._mo_ready = tk.DoubleVar(value=self._settings.get("multi_open_ready_timeout", 2.0))
+        self._mo_account_interval = tk.DoubleVar(value=self._settings.get("multi_open_account_interval", 3.0))
+        self._mo_send_interval = tk.DoubleVar(value=self._settings.get("multi_open_send_interval", 0.1))
+        self._mo_popup_retry = tk.IntVar(value=self._settings.get("multi_open_popup_retry", 0))
 
         # 坐标变量（延迟加载，从 coordinates.py）
         self._coord_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
@@ -143,18 +157,46 @@ class SettingsDialog(tk.Toplevel):
         nb.add(tab3, text="坐标")
         self._build_coord_tab(tab3)
 
-        # ---- 标签4: 更新 ----
+        # ---- 标签4: 多开 ----
         tab4 = ttk.Frame(nb, padding=16)
-        nb.add(tab4, text="更新")
-        self._build_update_tab(tab4)
+        nb.add(tab4, text="多开")
+
+        ttk.Label(tab4, text="流水线并发发送的时序参数（多开模式生效）：",
+                  font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+
+        def _row_delay(parent, label, var):
+            row = ttk.Frame(parent)
+            row.pack(fill=tk.X, pady=2)
+            ttk.Label(row, text=label).pack(side=tk.LEFT)
+            ttk.Entry(row, textvariable=var, width=10).pack(side=tk.RIGHT)
+
+        _row_delay(tab4, "窗口激活延迟 (s):", self._mo_activate)
+        _row_delay(tab4, "搜索后延迟 (s):", self._mo_search)
+        _row_delay(tab4, "就绪检测超时 (s):", self._mo_ready)
+        _row_delay(tab4, "账户切换间隔 (s):", self._mo_account_interval)
+        _row_delay(tab4, "发送间隔 (s):", self._mo_send_interval)
+
+        ttk.Separator(tab4, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+
+        retry_row = ttk.Frame(tab4)
+        retry_row.pack(fill=tk.X, pady=2)
+        ttk.Label(retry_row, text="弹窗检测重试次数:").pack(side=tk.LEFT)
+        ttk.Spinbox(retry_row, from_=0, to=5, textvariable=self._mo_popup_retry, width=6).pack(side=tk.RIGHT)
+
+        # ---- 标签5: 更新 ----
+        tab5 = ttk.Frame(nb, padding=16)
+        nb.add(tab5, text="更新")
+        self._build_update_tab(tab5)
 
         # 跳到指定标签
         if self._initial_tab == "OCR":
             nb.select(tab2)
         elif self._initial_tab == "坐标":
             nb.select(tab3)
-        elif self._initial_tab == "更新":
+        elif self._initial_tab == "多开":
             nb.select(tab4)
+        elif self._initial_tab == "更新":
+            nb.select(tab5)
 
         # ---- 底部 ----
         btn_frame = ttk.Frame(self, padding=12)
@@ -169,6 +211,12 @@ class SettingsDialog(tk.Toplevel):
         self._settings["scan_page_count"] = self._page_count.get()
         self._settings["scan_scroll_px"] = self._scroll_px.get()
         self._settings["scan_pages_per_scroll"] = self._pages_per.get()
+        self._settings["multi_open_activate_delay"] = float(self._mo_activate.get())
+        self._settings["multi_open_search_delay"] = float(self._mo_search.get())
+        self._settings["multi_open_ready_timeout"] = float(self._mo_ready.get())
+        self._settings["multi_open_account_interval"] = float(self._mo_account_interval.get())
+        self._settings["multi_open_send_interval"] = float(self._mo_send_interval.get())
+        self._settings["multi_open_popup_retry"] = int(self._mo_popup_retry.get())
         save_settings(self._settings)
         self._save_coordinates()
         self.destroy()
