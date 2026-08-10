@@ -103,54 +103,46 @@ class WeChatBridge:
             logger.exception("创建 UIA 控件失败")
             return None
 
-    def find_window(self) -> bool:
-        """查找微信窗口：Qt 类名 + '微信'/'Weixin' 标题"""
+    def find_all_windows(self) -> list[tuple[int, str, str]]:
+        """枚举所有可见微信主窗口，返回 [(hwnd, title, class)] 列表
+
+        匹配规则与 find_window 一致：Qt 类名 + 标题含 '微信'/'Weixin'，
+        排除自身进程的窗口。找不到则返回空列表。
+        """
         import win32process
         self._ensure_com()
-        matches: list[int] = []
         self_pid = os.getpid()
 
         def _is_self(hwnd: int) -> bool:
-            """检查窗口是否属于当前进程（排除自身）"""
             try:
                 _, pid = win32process.GetWindowThreadProcessId(hwnd)
                 return pid == self_pid
             except Exception:
                 return False
 
-        def _enum(hwnd: int, _results: list[int]) -> bool:
+        matches: list[tuple[int, str, str]] = []
+
+        def _enum(hwnd: int, results: list) -> bool:
             if not win32gui.IsWindowVisible(hwnd) or _is_self(hwnd):
                 return True
             title = win32gui.GetWindowText(hwnd)
             cls = win32gui.GetClassName(hwnd)
-            has_title = any(pattern in title for pattern in WEIXIN_WINDOW_TITLES)
-            is_qt = 'Qt' in cls
-            if has_title and is_qt:
-                _results.append(hwnd)
-                return False
+            if any(pattern in title for pattern in WEIXIN_WINDOW_TITLES) and 'Qt' in cls:
+                results.append((hwnd, title, cls))
             return True
 
         win32gui.EnumWindows(_enum, matches)
+        return matches
 
-        if not matches:
-            def _enum2(hwnd, results):
-                if not win32gui.IsWindowVisible(hwnd) or _is_self(hwnd):
-                    return True
-                title = win32gui.GetWindowText(hwnd)
-                if any(pattern in title for pattern in WEIXIN_WINDOW_TITLES):
-                    results.append(hwnd)
-                    return False
-                return True
-            win32gui.EnumWindows(_enum2, matches)
-
+    def find_window(self) -> bool:
+        """查找微信窗口：取 find_all_windows 的第一个匹配（保持单账户行为）"""
+        matches = self.find_all_windows()
         if matches:
-            self._hwnd = matches[0]
-            title = win32gui.GetWindowText(self._hwnd)
-            cls = win32gui.GetClassName(self._hwnd)
+            self._hwnd = matches[0][0]
+            title, cls = matches[0][1], matches[0][2]
             logger.info("已连接微信: hwnd=0x%X, class='%s', title='%s'",
                         self._hwnd, cls, title)
             return True
-
         logger.warning("未找到微信窗口（标题含'微信'/'Weixin'）")
         return False
 
