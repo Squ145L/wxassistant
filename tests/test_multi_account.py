@@ -1,5 +1,10 @@
 # tests/test_multi_account.py
-from src.services.multi_account import AccountWindow, MultiAccountSession
+from src.services.multi_account import (
+    AccountWindow,
+    MultiAccountSession,
+    find_overlapping_accounts,
+    rects_overlap,
+)
 
 
 def test_add_and_count():
@@ -56,3 +61,32 @@ def test_account_window_frozen_fields():
     a = AccountWindow(name="x", hwnd=123, order=0)
     assert a.hwnd == 123
     assert a.order == 0
+
+
+def test_rects_overlap_no_overlap():
+    assert not rects_overlap((0, 0, 100, 100), (200, 200, 300, 300))
+
+
+def test_rects_overlap_partial():
+    assert rects_overlap((0, 0, 100, 100), (50, 50, 150, 150))
+
+
+def test_rects_overlap_contained():
+    assert rects_overlap((0, 0, 200, 200), (50, 50, 100, 100))
+
+
+def test_rects_overlap_touching_edges_not():
+    # 右边刚好接触（交叠宽为 0）不算重叠
+    assert not rects_overlap((0, 0, 100, 100), (100, 0, 200, 100))
+
+
+def test_find_overlapping_accounts():
+    rects = [("A", (0, 0, 100, 100)), ("B", (50, 50, 150, 150)), ("C", (300, 300, 400, 400))]
+    pairs = find_overlapping_accounts(rects)
+    assert ("A", "B") in pairs
+    assert len(pairs) == 1
+
+
+def test_find_overlapping_accounts_empty_when_no_overlap():
+    rects = [("A", (0, 0, 100, 100)), ("B", (200, 200, 300, 300))]
+    assert find_overlapping_accounts(rects) == []

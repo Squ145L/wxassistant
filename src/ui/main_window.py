@@ -19,6 +19,7 @@ from src.ui.friend_list import FriendList
 from src.ui.message_editor import MessageEditor
 from src.ui.send_progress import SendProgress
 from src.ui.result_dialog import ResultDialog
+from src.services.multi_account import find_overlapping_accounts
 
 logger = logging.getLogger(__name__)
 
@@ -504,6 +505,25 @@ class MainWindow:
     # 发送控制
     # ================================================================
 
+    def _check_window_overlap(self) -> bool:
+        """多账户模式下检测窗口重叠。返回 True=无重叠或用户选择继续"""
+        if self._multi_session is None:
+            return True
+        rects: list[tuple[str, tuple]] = []
+        for name, (bridge, _fs) in self._account_runtime.items():
+            rect = bridge.get_window_rect()
+            if rect is not None:
+                rects.append((name, rect))
+        pairs = find_overlapping_accounts(rects)
+        if not pairs:
+            return True
+        names = "\n".join(f"  • {a} 与 {b}" for a, b in pairs)
+        return messagebox.askyesno(
+            "检测到窗口重叠",
+            f"以下窗口存在重叠，可能互相遮挡导致操作错误：\n{names}\n\n"
+            "建议平铺窗口后重新进入多开。\n是否仍然继续？",
+        )
+
     def _on_start_send(self):
         selected = self.friend_list.get_selected()
         if not selected:
@@ -513,6 +533,10 @@ class MainWindow:
         message = self.message_editor.get_message()
         if not message.strip():
             messagebox.showwarning("提示", "请输入消息内容。")
+            return
+
+        # 多账户模式：发送前检测窗口重叠（防止切窗操作点错窗口）
+        if not self._check_window_overlap():
             return
 
         attachments = self.message_editor.get_attachments()

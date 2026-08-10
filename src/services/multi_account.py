@@ -62,3 +62,30 @@ class MultiAccountSession:
         for i, a in enumerate(self._accounts):
             if a.order != i:
                 self._accounts[i] = AccountWindow(name=a.name, hwnd=a.hwnd, order=i)
+
+
+def rects_overlap(r1, r2, min_pixels: int = 1) -> bool:
+    """两个窗口矩形是否交叠（屏幕坐标 (left, top, right, bottom)）
+
+    仅当交叠区域宽、高均 >= min_pixels 才算重叠（避免贴边误报）。
+    """
+    x1 = max(r1[0], r2[0])
+    y1 = max(r1[1], r2[1])
+    x2 = min(r1[2], r2[2])
+    y2 = min(r1[3], r2[3])
+    return (x2 - x1) >= min_pixels and (y2 - y1) >= min_pixels
+
+
+def find_overlapping_accounts(
+    account_rects: list[tuple[str, tuple]],
+) -> list[tuple[str, str]]:
+    """检测多账户窗口两两重叠，返回重叠账户名对 [(name1, name2)]
+
+    account_rects: [(账户名, GetWindowRect 返回的 (left, top, right, bottom))]
+    """
+    pairs: list[tuple[str, str]] = []
+    for i in range(len(account_rects)):
+        for j in range(i + 1, len(account_rects)):
+            if rects_overlap(account_rects[i][1], account_rects[j][1]):
+                pairs.append((account_rects[i][0], account_rects[j][0]))
+    return pairs

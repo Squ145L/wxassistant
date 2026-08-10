@@ -44,7 +44,7 @@ class MultiOpenWizard:
 
         ttk.Label(
             self.root,
-            text="检测到微信窗口后，逐个把窗口显示到最前，\n请在每个窗口确认它属于哪个账户（账户名可自定义）。",
+            text="检测到微信窗口后，逐个把窗口显示到最前，\n请在每个窗口确认它属于哪个账户（账户名可自定义）。\n\n⚠ 请先将微信窗口平铺、勿重叠，否则发送前会被拦截提醒。",
             justify=tk.LEFT,
         ).pack(anchor=tk.W, **pad)
 
