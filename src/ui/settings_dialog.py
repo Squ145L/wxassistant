@@ -7,6 +7,7 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 from pathlib import Path
+from typing import Optional
 
 SETTINGS_PATH = Path("cache/settings.json")
 DEFAULT_SETTINGS = {
@@ -66,13 +67,18 @@ def save_settings(settings: dict) -> None:
 
 class SettingsDialog(tk.Toplevel):
 
-    def __init__(self, parent: tk.Widget, tab: str = "常规"):
+    def __init__(self, parent: tk.Widget, tab: str = "常规",
+                 account_name: Optional[str] = None,
+                 account_names: Optional[list[str]] = None):
         super().__init__(parent)
         self.title("设置")
         self.resizable(True, True)
         self.minsize(600, 460)  # 坐标 tab 每行控件较多, 最小宽度给足防止右侧按钮被挤
         self.transient(parent)
         self._initial_tab = tab
+        self._parent = parent
+        self._account_name = account_name      # 当前账户（None=全局/单账户）
+        self._account_names = account_names    # 可用账户列表（多账户模式）
         self.protocol("WM_DELETE_WINDOW", self._on_close)  # X 按钮也保存
 
         self._settings = load_settings()
@@ -97,7 +103,19 @@ class SettingsDialog(tk.Toplevel):
         self._center(parent)
 
     def _build_ui(self) -> None:
+        # 账户行（多账户模式显示，切换 = 保存当前 + 重开对应账户的设置）
+        if self._account_names:
+            acct_row = ttk.Frame(self)
+            acct_row.pack(fill=tk.X, padx=8, pady=(8, 0))
+            ttk.Label(acct_row, text="账户:", font=("Microsoft YaHei", 9)).pack(side=tk.LEFT)
+            self._account_combo = ttk.Combobox(
+                acct_row, values=self._account_names, state="readonly", width=12)
+            self._account_combo.set(self._account_name or self._account_names[0])
+            self._account_combo.pack(side=tk.LEFT, padx=(6, 0))
+            self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
+
         nb = ttk.Notebook(self)
+        self._nb = nb
         nb.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
         # ---- 标签1: 常规 ----
@@ -221,6 +239,17 @@ class SettingsDialog(tk.Toplevel):
         self._save_coordinates()
         self.destroy()
 
+    def _on_account_selected(self, _event=None) -> None:
+        """设置弹窗内切换账户：保存当前账户 → 重开对应账户的设置"""
+        new = self._account_combo.get()
+        if not new or new == self._account_name:
+            return
+        current_tab = self._nb.select()
+        tab_name = self._nb.tab(current_tab, "text")
+        self._on_close()  # 保存当前账户并关闭
+        SettingsDialog(self._parent, tab=tab_name,
+                       account_name=new, account_names=self._account_names)
+
     def _on_logging_toggled(self) -> None:
         from src.utils.logger import set_file_logging
         set_file_logging(self._logging_enabled.get())
@@ -255,7 +284,7 @@ class SettingsDialog(tk.Toplevel):
                 from src.utils.coordinates import get_coord
                 rect = win32gui.GetWindowRect(hwnd)
                 if rect:
-                    cx_pct, cy_pct = get_coord("cm_list_focus")
+                    cx_pct, cy_pct = get_coord("cm_list_focus", self._account_name)
                     fx = rect[0] + int((rect[2] - rect[0]) * cx_pct)
                     fy = rect[1] + int((rect[3] - rect[1]) * cy_pct)
                     bridge.click_at(fx, fy)
@@ -273,7 +302,11 @@ class SettingsDialog(tk.Toplevel):
     def _reset_ocr(self) -> None:
         if not messagebox.askyesno("OCR 校准重置", "确认清除所有 OCR 校准参数？"):
             return
-        config_path = Path("cache/ocr_calibration.json")
+        if self._account_name:
+            from src.utils.account_paths import calibration_path_for
+            config_path = calibration_path_for(self._account_name)
+        else:
+            config_path = Path("cache/ocr_calibration.json")
         if config_path.exists():
             config_path.write_text("{}", encoding="utf-8")
         messagebox.showinfo("已重置", "OCR 校准参数已清除。")
@@ -292,7 +325,7 @@ class SettingsDialog(tk.Toplevel):
             has_image_for = lambda _k: False
 
         self._all_coord_keys: list[str] = []
-        coords = load_coordinates()
+        coords = load_coordinates(self._account_name)
 
         # 滚动区（坐标多时避免溢出）
         canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
@@ -387,7 +420,7 @@ class SettingsDialog(tk.Toplevel):
                 coords[key] = (x, y)
             except ValueError:
                 coords[key] = DEFAULT_COORDINATES.get(key, (0.0, 0.0))
-        save_coordinates(coords)
+        save_coordinates(coords, self._account_name)
 
     @staticmethod
     def _launch_mouse_tracker() -> None:

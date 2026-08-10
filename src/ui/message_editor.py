@@ -14,6 +14,7 @@ class MessageEditor(ttk.Frame):
         super().__init__(parent, padding=8)
         self._attachments: list[str] = []
         self._on_text_changed: Optional[Callable[[], None]] = None
+        self._on_open_settings: Optional[Callable[[], None]] = None
         self._build_ui()
 
     def _build_ui(self):
@@ -25,7 +26,7 @@ class MessageEditor(ttk.Frame):
         # 空间不足时最后 pack 的控件会被挤掉/重叠, 所以按钮必须先占位保证可见
         ttk.Button(
             header, text="设置", width=5,
-            command=self._open_settings,
+            command=self._open_settings_clicked,
         ).pack(side=tk.RIGHT)
 
         ttk.Label(header, text="📝 消息模板", font=("", 11, "bold")).pack(side=tk.LEFT)
@@ -185,10 +186,16 @@ class MessageEditor(ttk.Frame):
         else:
             self._var_hint_var.set("")
 
-    @staticmethod
-    def _open_settings():
-        from src.ui.settings_dialog import SettingsDialog
-        # 获取当前 message_editor 所在的顶层窗口
-        root = tk._default_root
-        if root:
-            SettingsDialog(root)
+    def _open_settings_clicked(self):
+        if self._on_open_settings:
+            self._on_open_settings()
+        else:
+            from src.ui.settings_dialog import SettingsDialog
+            # 获取当前 message_editor 所在的顶层窗口
+            root = tk._default_root
+            if root:
+                SettingsDialog(root)
+
+    def set_on_open_settings(self, callback):
+        """注入打开设置的入口（MainWindow 传入，携带当前账户上下文）"""
+        self._on_open_settings = callback

@@ -188,6 +188,8 @@ class MainWindow:
         )
         # 消息模板被修改 → 清除失败红字
         self.message_editor.set_on_text_changed(self.friend_list.clear_failed_marks)
+        # 消息编辑器"设置"按钮 → 统一入口（带当前账户上下文）
+        self.message_editor.set_on_open_settings(self._open_settings)
 
     # ================================================================
     # 好友管理
@@ -508,8 +510,29 @@ class MainWindow:
         os.startfile(str(Path(__file__).parent.parent.parent))
 
     def _on_import_settings_clicked(self):
+        self._open_settings("OCR")
+
+    def _current_account_name(self) -> Optional[str]:
+        """当前账户名（多账户）；单账户返回 None"""
+        if self._multi_session is not None and self._account_var:
+            return self._account_var.get()
+        return None
+
+    def _current_account_names(self) -> list[str]:
+        """多账户模式下的全部账户名；单账户返回空列表"""
+        if self._multi_session is not None:
+            return self._multi_session.names
+        return []
+
+    def _open_settings(self, tab: str = "常规") -> None:
+        """打开设置弹窗（携带当前账户上下文）"""
         from src.ui.settings_dialog import SettingsDialog
-        SettingsDialog(self.root, tab="OCR")
+        names = self._current_account_names()
+        SettingsDialog(
+            self.root, tab=tab,
+            account_name=self._current_account_name(),
+            account_names=names or None,
+        )
 
     # ================================================================
     # 发送控制
