@@ -33,8 +33,8 @@ LOG_DATE_FORMAT = "%m-%d %H:%M:%S"
 WINDOW_WIDTH = 1100
 WINDOW_HEIGHT = 720
 WINDOW_TITLE = "微信助手 - 群发工具"
-LEFT_PANEL_WIDTH = 400
-LEFT_MIN_PANEL_WIDTH = 300  # 分割线最小宽度：限制联系人面板不能拖得过窄
+LEFT_PANEL_WIDTH = 200
+LEFT_MIN_PANEL_WIDTH = 380  # 分割线最小宽度：限制联系人面板不能拖得过窄
 
 # ========== 限制 ==========
 MAX_ATTACHMENT_MB = 100

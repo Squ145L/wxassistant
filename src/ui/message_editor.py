@@ -14,7 +14,6 @@ class MessageEditor(ttk.Frame):
         super().__init__(parent, padding=8)
         self._attachments: list[str] = []
         self._on_text_changed: Optional[Callable[[], None]] = None
-        self._on_open_settings: Optional[Callable[[], None]] = None
         self._build_ui()
 
     def _build_ui(self):
@@ -22,15 +21,8 @@ class MessageEditor(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X, pady=(0, 4))
 
-        # 设置按钮最先 pack(side=RIGHT): pack 按 pack 顺序分配空间,
-        # 空间不足时最后 pack 的控件会被挤掉/重叠, 所以按钮必须先占位保证可见
-        ttk.Button(
-            header, text="设置", width=5,
-            command=self._open_settings_clicked,
-        ).pack(side=tk.RIGHT)
-
         ttk.Label(header, text="📝 消息模板", font=("", 11, "bold")).pack(side=tk.LEFT)
-        # 提示文字最后 pack + expand: 宽度不足时它先被压缩(文字截断), 保护设置按钮
+        # 提示文字 expand: 宽度不足时它先被压缩(文字截断)
         ttk.Label(
             header, text="[name]=好友名 [name2]=后两字",
             foreground="gray", font=("", 9), anchor=tk.W,
@@ -186,16 +178,3 @@ class MessageEditor(ttk.Frame):
         else:
             self._var_hint_var.set("")
 
-    def _open_settings_clicked(self):
-        if self._on_open_settings:
-            self._on_open_settings()
-        else:
-            from src.ui.settings_dialog import SettingsDialog
-            # 获取当前 message_editor 所在的顶层窗口
-            root = tk._default_root
-            if root:
-                SettingsDialog(root)
-
-    def set_on_open_settings(self, callback):
-        """注入打开设置的入口（MainWindow 传入，携带当前账户上下文）"""
-        self._on_open_settings = callback

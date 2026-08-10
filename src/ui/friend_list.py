@@ -61,9 +61,11 @@ class FriendList(ttk.Frame):
         self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
 
         ttk.Button(top, text="反选", width=4, command=self.invert_selection).pack(side=tk.LEFT, padx=2)
-        # 删除：红字（保留默认边框，避免像超链接）
-        tk.Button(top, text="删除", fg="#D32F2F",
-                  command=self._delete_friend).pack(side=tk.LEFT, padx=2)
+        # 删除：ttk 样式统一（和反选一致）+ 红字警示
+        style = ttk.Style()
+        style.configure("Danger.TButton", foreground="#D32F2F")
+        ttk.Button(top, text="删除", style="Danger.TButton",
+                   command=self._delete_friend).pack(side=tk.LEFT, padx=2)
 
         self._label_count = ttk.Label(top, text="", foreground="gray", font=("", 9))
         self._label_count.pack(side=tk.RIGHT)

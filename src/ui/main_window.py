@@ -190,8 +190,6 @@ class MainWindow:
         )
         # 消息模板被修改 → 清除失败红字
         self.message_editor.set_on_text_changed(self.friend_list.clear_failed_marks)
-        # 消息编辑器"设置"按钮 → 统一入口（带当前账户上下文）
-        self.message_editor.set_on_open_settings(self._open_settings)
 
     # ================================================================
     # 好友管理

@@ -27,7 +27,7 @@ class FilterBar(ttk.Frame):
 
         self._entry = ttk.Entry(
             row, textvariable=self._filter_var, font=("Consolas", 10), width=20)
-        self._entry.pack(side=tk.LEFT, padx=(0, 2), fill=tk.X, expand=True)
+        self._entry.pack(side=tk.LEFT, padx=(0, 2))
 
         ttk.Button(row, text="✕", width=3, command=self._clear_filter).pack(side=tk.LEFT, padx=(0, 2))
 
