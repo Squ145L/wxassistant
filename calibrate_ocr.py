@@ -26,6 +26,15 @@ PROJECT_DIR = Path(__file__).resolve().parent
 CACHE_DIR = PROJECT_DIR / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_PATH = CACHE_DIR / "ocr_calibration.json"
+ACCOUNT = None  # --account 参数（多开时按账户保存校准）
+
+
+def _config_path():
+    """账户专属校准文件（指定账户时），否则全局文件"""
+    if ACCOUNT:
+        from src.utils.account_paths import calibration_path_for
+        return calibration_path_for(ACCOUNT)
+    return CONFIG_PATH
 
 DEFAULTS = {
     "chat_title": {
@@ -65,29 +74,35 @@ def find_wechat(key: str = ""):
 
 def load_config(key: str) -> dict:
     defaults = dict(DEFAULTS.get(key, {}))
-    if CONFIG_PATH.exists():
+    path = _config_path()
+    if path.exists():
         try:
-            data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
             if key in data: defaults.update(data[key])
         except Exception: pass
     return defaults
 
 
 def save_config(key: str, params: dict) -> None:
+    path = _config_path()
     existing = {}
-    if CONFIG_PATH.exists():
-        try: existing = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    if path.exists():
+        try: existing = json.loads(path.read_text(encoding="utf-8"))
         except Exception: pass
     existing[key] = params
-    CONFIG_PATH.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main():
+    global ACCOUNT
     key = "chat_title"
     for arg in sys.argv[1:]:
         if arg.startswith("--key="): key = arg.split("=", 1)[1]
         elif arg == "--key" and len(sys.argv) > sys.argv.index(arg) + 1:
             key = sys.argv[sys.argv.index(arg) + 1]
+        elif arg.startswith("--account="): ACCOUNT = arg.split("=", 1)[1]
+        elif arg == "--account" and len(sys.argv) > sys.argv.index(arg) + 1:
+            ACCOUNT = sys.argv[sys.argv.index(arg) + 1]
 
     if key not in DEFAULTS:
         print(f"未知 key: {key}"); sys.exit(1)
@@ -202,12 +217,13 @@ def main():
 
     def do_reset():
         if messagebox.askyesno("重置", f"确认删除 [{key}] 的校准参数？"):
-            if CONFIG_PATH.exists():
+            path = _config_path()
+            if path.exists():
                 try:
-                    data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+                    data = json.loads(path.read_text(encoding="utf-8"))
                     if key in data:
                         del data[key]
-                    CONFIG_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
                 except Exception:
                     pass
             messagebox.showinfo("已重置", f"区域 [{key}] 已重置。")

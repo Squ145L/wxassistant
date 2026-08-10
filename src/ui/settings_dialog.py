@@ -7,7 +7,7 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 SETTINGS_PATH = Path("cache/settings.json")
 DEFAULT_SETTINGS = {
@@ -69,7 +69,8 @@ class SettingsDialog(tk.Toplevel):
 
     def __init__(self, parent: tk.Widget, tab: str = "常规",
                  account_name: Optional[str] = None,
-                 account_names: Optional[list[str]] = None):
+                 account_names: Optional[list[str]] = None,
+                 on_calibrate: Optional[Callable[[str], None]] = None):
         super().__init__(parent)
         self.title("设置")
         self.resizable(True, True)
@@ -79,6 +80,7 @@ class SettingsDialog(tk.Toplevel):
         self._parent = parent
         self._account_name = account_name      # 当前账户（None=全局/单账户）
         self._account_names = account_names    # 可用账户列表（多账户模式）
+        self._on_calibrate = on_calibrate      # (key) -> None，打开 OCR 校准
         self.protocol("WM_DELETE_WINDOW", self._on_close)  # X 按钮也保存
 
         self._settings = load_settings()
@@ -166,6 +168,11 @@ class SettingsDialog(tk.Toplevel):
                    command=self._run_test).pack(pady=(0, 4))
 
         ttk.Separator(tab2, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
+
+        ttk.Button(tab2, text="校准聊天界面标题",
+                   command=lambda: self._calibrate("chat_title")).pack(pady=(0, 4))
+        ttk.Button(tab2, text="校准通讯录区域",
+                   command=lambda: self._calibrate("contacts_list")).pack(pady=(0, 8))
 
         ttk.Button(tab2, text="OCR 校准重置",
                    command=self._reset_ocr).pack(pady=(0, 8))
@@ -310,6 +317,18 @@ class SettingsDialog(tk.Toplevel):
         if config_path.exists():
             config_path.write_text("{}", encoding="utf-8")
         messagebox.showinfo("已重置", "OCR 校准参数已清除。")
+
+    def _calibrate(self, key: str) -> None:
+        """打开 OCR 校准工具（优先走 MainWindow 的入口，带账户）"""
+        if self._on_calibrate:
+            self._on_calibrate(key)
+        else:
+            import subprocess
+            script = Path(__file__).parent.parent.parent / "calibrate_ocr.py"
+            cmd = ["python", str(script), "--key", key]
+            if self._account_name:
+                cmd += ["--account", self._account_name]
+            subprocess.Popen(cmd)
 
     def _build_coord_tab(self, parent: ttk.Frame) -> None:
         """构建坐标标签页：每个坐标一行 X% + Y% spinbox"""

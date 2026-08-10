@@ -313,13 +313,13 @@ class MainWindow:
                     if rect:
                         ww = rect[2] - rect[0]; wh = rect[3] - rect[1]
                         # 点微信主界面(聊天)标签
-                        cx_pct, cy_pct = get_coord("tab_chat")
+                        cx_pct, cy_pct = get_coord("tab_chat", self._current_account_name())
                         self._bridge.click_at(
                             rect[0] + int(ww * cx_pct),
                             rect[1] + int(wh * cy_pct))
                         time.sleep(0.5)
                         # 点第一个聊天
-                        cx_pct, cy_pct = get_coord("chat_first")
+                        cx_pct, cy_pct = get_coord("chat_first", self._current_account_name())
                         self._bridge.click_at(
                             rect[0] + int(ww * cx_pct),
                             rect[1] + int(wh * cy_pct))
@@ -331,9 +331,13 @@ class MainWindow:
 
     def _launch_calibrate_subprocess(self, key: str):
         script = Path(__file__).parent.parent.parent / "calibrate_ocr.py"
-        subprocess.Popen(["python", str(script), "--key", key])
+        cmd = ["python", str(script), "--key", key]
+        acct = self._current_account_name()
+        if acct:
+            cmd += ["--account", acct]
+        subprocess.Popen(cmd)
         self.send_progress.set_status("就绪")
-        logger.info("启动校准: key=%s", key)
+        logger.info("启动校准: key=%s account=%s", key, acct)
 
     def _ensure_calibration(self, key: str) -> bool:
         config_path = Path("cache/ocr_calibration.json")
@@ -534,13 +538,14 @@ class MainWindow:
         return []
 
     def _open_settings(self, tab: str = "常规") -> None:
-        """打开设置弹窗（携带当前账户上下文）"""
+        """打开设置弹窗（携带当前账户上下文 + 校准入口）"""
         from src.ui.settings_dialog import SettingsDialog
         names = self._current_account_names()
         SettingsDialog(
             self.root, tab=tab,
             account_name=self._current_account_name(),
             account_names=names or None,
+            on_calibrate=self._launch_calibrate,
         )
 
     # ================================================================
