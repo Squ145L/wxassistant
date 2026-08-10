@@ -81,7 +81,19 @@ def cmd_test_ocr() -> int:
 
 
 def run_gui() -> None:
-    """启动 GUI"""
+    """启动 GUI（单账户模式）"""
+    window = _build_window(multi_session=None)
+    window.run()
+
+
+def run_multi_gui(session) -> None:
+    """启动 GUI（多账户模式）"""
+    window = _build_window(multi_session=session)
+    window.run()
+
+
+def _build_window(multi_session=None):
+    """构造主窗口。multi_session 为 None = 单账户模式，否则多账户模式"""
     from src.driver.wechat_bridge import WeChatBridge
     from src.services.friend_service import FriendService
     from src.services.template_engine import TemplateEngine
@@ -93,28 +105,58 @@ def run_gui() -> None:
         make_search_contacts_callback,
     )
 
-    bridge = WeChatBridge()
-    bridge.find_window()  # 主线程提前找到窗口
-
-    friend_service = FriendService()
     template_engine = TemplateEngine()
     send_service = SendService()
 
-    friend_service.load_cache()
+    if multi_session is None:
+        # ---- 单账户模式（原逻辑）----
+        bridge = WeChatBridge()
+        bridge.find_window()
+        friend_service = FriendService()
+        friend_service.load_cache()
 
-    window = MainWindow()
-    window.set_bridge(bridge)
-    bridge.set_hook_control(
-        window.suspend_interrupt_hook,
-        window.resume_interrupt_hook,
-    )
-    window.set_friend_service(friend_service)
+        window = MainWindow()
+        window.set_bridge(bridge)
+        window.set_friend_service(friend_service)
+        window.set_send_callback(
+            make_send_callback(lambda: bridge, template_engine, send_service))
+        window.set_check_names_callback(
+            make_check_names_callback(lambda: bridge, friend_service))
+        window.set_search_contacts_callback(
+            make_search_contacts_callback(lambda: bridge, friend_service))
+        window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))
+        return window
+
+    # ---- 多账户模式 ----
+    window = MainWindow(multi_session=multi_session)
+
+    runtime: dict[str, tuple] = {}
+    for acc in multi_session.accounts:
+        b = WeChatBridge()
+        b._hwnd = acc.hwnd  # 绑定该账户窗口（不重新 find_window）
+        fs = FriendService.for_account(acc.name)
+        fs.load_cache()
+        runtime[acc.name] = (b, fs)
+    window.set_account_runtime(runtime)
+
     window.set_send_callback(
-        make_send_callback(bridge, template_engine, send_service))
+        make_send_callback(window.get_current_bridge, template_engine, send_service))
     window.set_check_names_callback(
-        make_check_names_callback(bridge, friend_service))
+        make_check_names_callback(window.get_current_bridge, window.get_current_friend_service))
     window.set_search_contacts_callback(
-        make_search_contacts_callback(bridge, friend_service))
+        make_search_contacts_callback(window.get_current_bridge, window.get_current_friend_service))
+    window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))
+    return window
 
-    logger.info("启动 GUI")
-    window.run()
+
+def _enter_multiopen(window) -> None:
+    """点 [多开]：关闭主窗口 → 打开引导 → 按结果重启对应模式"""
+    from src.driver.wechat_bridge import WeChatBridge
+    from src.ui.multi_account_dialog import run_multiopen_wizard
+
+    window.root.destroy()
+    session = run_multiopen_wizard(WeChatBridge())
+    if session is None:
+        run_gui()  # 取消 → 回单账户模式
+    else:
+        run_multi_gui(session)
