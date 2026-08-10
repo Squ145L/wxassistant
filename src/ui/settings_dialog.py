@@ -74,7 +74,7 @@ class SettingsDialog(tk.Toplevel):
         super().__init__(parent)
         self.title("设置")
         self.resizable(True, True)
-        self.minsize(600, 460)  # 坐标 tab 每行控件较多, 最小宽度给足防止右侧按钮被挤
+        self.minsize(700, 500)  # 坐标 tab 每行控件较多, 最小宽度给足防止右侧按钮被挤
         self.transient(parent)
         self._initial_tab = tab
         self._parent = parent

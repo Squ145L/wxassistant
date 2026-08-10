@@ -52,7 +52,7 @@ class FriendList(ttk.Frame):
 
         ttk.Separator(top, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=8, fill=tk.Y)
 
-        self._btn_add = ttk.Button(top, text="➕ 添加", command=self._pop_add_menu)
+        self._btn_add = ttk.Button(top, text="+", width=2, command=self._pop_add_menu)
         self._btn_add.pack(side=tk.LEFT, padx=2)
 
         self._add_menu = tk.Menu(self, tearoff=0)
@@ -61,7 +61,9 @@ class FriendList(ttk.Frame):
         self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
 
         ttk.Button(top, text="反选", command=self.invert_selection).pack(side=tk.LEFT, padx=2)
-        ttk.Button(top, text="🗑 删除", command=self._delete_friend).pack(side=tk.LEFT, padx=2)
+        # 删除：红字无图标（去掉特殊符号）
+        tk.Button(top, text="删除", fg="#D32F2F", relief=tk.FLAT,
+                  command=self._delete_friend).pack(side=tk.LEFT, padx=2)
 
         self._label_count = ttk.Label(top, text="", foreground="gray", font=("", 9))
         self._label_count.pack(side=tk.RIGHT)

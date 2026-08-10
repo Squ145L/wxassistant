@@ -30,10 +30,10 @@ LOG_FORMAT = "%(asctime)s [%(levelname)-5s] %(name)s: %(message)s"
 LOG_DATE_FORMAT = "%m-%d %H:%M:%S"
 
 # ========== UI 尺寸 ==========
-WINDOW_WIDTH = 960
-WINDOW_HEIGHT = 700
+WINDOW_WIDTH = 1100
+WINDOW_HEIGHT = 720
 WINDOW_TITLE = "微信助手 - 群发工具"
-LEFT_PANEL_WIDTH = 420
+LEFT_PANEL_WIDTH = 450
 
 # ========== 限制 ==========
 MAX_ATTACHMENT_MB = 100
