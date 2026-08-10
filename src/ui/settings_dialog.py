@@ -63,7 +63,7 @@ class SettingsDialog(tk.Toplevel):
         super().__init__(parent)
         self.title("设置")
         self.resizable(True, True)
-        self.minsize(460, 420)
+        self.minsize(600, 460)  # 坐标 tab 每行控件较多, 最小宽度给足防止右侧按钮被挤
         self.transient(parent)
         self._initial_tab = tab
         self.protocol("WM_DELETE_WINDOW", self._on_close)  # X 按钮也保存
@@ -271,11 +271,14 @@ class SettingsDialog(tk.Toplevel):
         for group_name, keys in COORD_GROUPS:
             group_row = ttk.Frame(scroll_frame)
             group_row.pack(fill=tk.X, pady=(12, 4))
+            # 组名列 weight=1: 窗口变窄时先压缩组名, 保护右侧「鼠标位置」按钮
+            group_row.columnconfigure(0, weight=1)
             ttk.Label(group_row, text=group_name,
-                      font=("Microsoft YaHei", 10, "bold")).pack(side=tk.LEFT)
+                      font=("Microsoft YaHei", 10, "bold"),
+                      anchor=tk.W).grid(row=0, column=0, sticky=tk.W)
             if group_name == "微信主界面":
                 ttk.Button(group_row, text="鼠标位置", width=9,
-                           command=self._launch_mouse_tracker).pack(side=tk.RIGHT)
+                           command=self._launch_mouse_tracker).grid(row=0, column=1)
 
             for key in keys:
                 self._all_coord_keys.append(key)
@@ -284,32 +287,36 @@ class SettingsDialog(tk.Toplevel):
 
                 row = ttk.Frame(scroll_frame)
                 row.pack(fill=tk.X, pady=1)
+                # 名称列 weight=1: 窗口变窄时先压缩名称文字, 保护右侧 X/Y 输入和按钮
+                row.columnconfigure(0, weight=1)
 
-                # 标签（缩短宽度防止小屏被挤出）
-                ttk.Label(row, text=label_text, width=16, anchor=tk.W).pack(side=tk.LEFT)
+                ttk.Label(row, text=label_text, width=16, anchor=tk.W).grid(
+                    row=0, column=0, sticky=tk.W)
 
                 # X%
-                ttk.Label(row, text="X:").pack(side=tk.LEFT)
+                ttk.Label(row, text="X:").grid(row=0, column=1)
                 x_var = tk.StringVar(value=f"{cx:.4f}")
                 x_entry = ttk.Entry(row, textvariable=x_var, width=6,
                                     validate="key", validatecommand=pct_vcmd)
-                x_entry.pack(side=tk.LEFT, padx=(0, 4))
+                x_entry.grid(row=0, column=2, padx=(0, 4))
 
                 # Y%
-                ttk.Label(row, text="Y:").pack(side=tk.LEFT)
+                ttk.Label(row, text="Y:").grid(row=0, column=3)
                 y_var = tk.StringVar(value=f"{cy:.4f}")
                 y_entry = ttk.Entry(row, textvariable=y_var, width=6,
                                     validate="key", validatecommand=pct_vcmd)
-                y_entry.pack(side=tk.LEFT, padx=(0, 4))
+                y_entry.grid(row=0, column=4, padx=(0, 4))
 
                 # 测试点击按钮
                 ttk.Button(row, text="测试", width=4,
-                           command=lambda k=key: self._test_coord_click(k)).pack(side=tk.LEFT, padx=(0, 2))
+                           command=lambda k=key: self._test_coord_click(k)).grid(
+                    row=0, column=5, padx=(0, 2))
 
                 # 重新校准按钮（有帮助图片才显示）
                 if has_image_for(key):
                     ttk.Button(row, text="重新校准",
-                               command=lambda k=key: self._launch_coord_picker(k)).pack(side=tk.LEFT)
+                               command=lambda k=key: self._launch_coord_picker(k)).grid(
+                        row=0, column=6)
 
                 self._coord_vars[key] = (x_var, y_var)
 
@@ -496,7 +503,7 @@ class SettingsDialog(tk.Toplevel):
             sh = self.winfo_screenheight()
 
             # 自适应尺寸：不超过屏幕 90%
-            w = min(500, int(sw * 0.9))
+            w = min(600, int(sw * 0.9))
             h = min(540, int(sh * 0.9))
 
             if pw > 10 and ph > 10:

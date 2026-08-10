@@ -21,17 +21,19 @@ class MessageEditor(ttk.Frame):
         header = ttk.Frame(self)
         header.pack(fill=tk.X, pady=(0, 4))
 
-        ttk.Label(header, text="📝 消息模板", font=("", 11, "bold")).pack(side=tk.LEFT)
-        ttk.Label(
-            header, text="[name]=好友名 [name2]=后两字",
-            foreground="gray", font=("", 9),
-        ).pack(side=tk.LEFT, padx=(10, 0))
-
-        # 设置按钮
+        # 设置按钮最先 pack(side=RIGHT): pack 按 pack 顺序分配空间,
+        # 空间不足时最后 pack 的控件会被挤掉/重叠, 所以按钮必须先占位保证可见
         ttk.Button(
             header, text="设置", width=5,
             command=self._open_settings,
         ).pack(side=tk.RIGHT)
+
+        ttk.Label(header, text="📝 消息模板", font=("", 11, "bold")).pack(side=tk.LEFT)
+        # 提示文字最后 pack + expand: 宽度不足时它先被压缩(文字截断), 保护设置按钮
+        ttk.Label(
+            header, text="[name]=好友名 [name2]=后两字",
+            foreground="gray", font=("", 9), anchor=tk.W,
+        ).pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
 
         # === 模板输入框（固定高度，不挤占底部空间）===
         template_frame = ttk.Frame(self)

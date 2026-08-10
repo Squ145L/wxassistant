@@ -1,0 +1,197 @@
+08-02 13:24:06 [INFO ] src.utils.coordinates: 坐标配置已保存: cache\coordinates.json
+08-02 13:24:08 [INFO ] src.ui.main_window: 中断键盘钩子已启动
+08-02 13:24:08 [INFO ] src.driver.wechat_bridge: 窗口已激活: 0x10A94
+08-02 13:24:08 [INFO ] src.driver.wechat_bridge: click_at: (839, 663)
+08-02 13:24:09 [INFO ] src.driver.wechat_bridge: click_at: (562, 335)
+08-02 13:24:09 [INFO ] src.driver.wechat_bridge: 点击通讯录管理: (722,249)
+08-02 13:24:09 [INFO ] src.driver.wechat_bridge: click_at: (722, 249)
+08-02 13:24:10 [INFO ] src.driver.wechat_bridge: 找到通讯录管理窗口: 0x300B52 '通讯录管理'
+08-02 13:24:10 [INFO ] src.driver.wechat_bridge: 窗口已最大化: 0x300B52
+08-02 13:24:10 [INFO ] src.driver.wechat_bridge: click_at: (1366, 306)
+08-02 13:24:11 [DEBUG] src.driver.wechat_bridge: 截图: (804,80)-(1102,1029) 298x949
+08-02 13:24:11 [INFO ] src.ui.main_window: 按键中断
+08-02 13:24:12 [INFO ] src.driver.wechat_bridge: 关闭通讯录管理窗口: 0x300B52
+08-02 13:24:13 [INFO ] OCR.engine: 已加载 OCR 混淆映射: 16 条
+08-02 13:24:13 [DEBUG] OCR.engine: OCR 识别到 9 条文本
+08-02 13:24:33 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:24:33 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:26:39 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:26:39 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:26:39 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:26:39 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:26:39 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:26:39 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:26:40 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:26:40 [INFO ] src.app: 启动 GUI
+08-02 13:26:56 [INFO ] src.utils.coordinates: 坐标配置已保存: cache\coordinates.json
+08-02 13:29:04 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:29:04 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:29:06 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:29:06 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:29:06 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:29:06 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:29:06 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:29:06 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:29:07 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:29:07 [INFO ] src.app: 启动 GUI
+08-02 13:31:37 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:31:37 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:31:38 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:31:38 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:31:38 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:31:38 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:31:38 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:31:38 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:31:39 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:31:39 [INFO ] src.app: 启动 GUI
+08-02 13:32:56 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:32:56 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:32:57 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:32:57 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:32:57 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:32:57 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:32:57 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:32:57 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:32:58 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:32:58 [INFO ] src.app: 启动 GUI
+08-02 13:34:07 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:34:07 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:34:09 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:34:09 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:34:09 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:34:09 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:34:09 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:34:09 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:34:10 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:34:10 [INFO ] src.app: 启动 GUI
+08-02 13:35:37 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:35:37 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:35:45 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:35:45 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:35:45 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:35:45 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:35:45 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:35:45 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:35:46 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:35:46 [INFO ] src.app: 启动 GUI
+08-02 13:37:16 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:37:16 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:37:17 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:37:17 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:37:17 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:37:17 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:37:17 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:37:17 [INFO ] src.services.friend_service: 从缓存加载 4 位好友
+08-02 13:37:18 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:37:18 [INFO ] src.app: 启动 GUI
+08-02 13:37:37 [INFO ] src.services.friend_service: 已添加好友: 'a' (共 5 人)
+08-02 13:37:37 [DEBUG] src.services.friend_service: 缓存调度保存: 5 位好友
+08-02 13:38:10 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:38:10 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:39:27 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:39:27 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:39:27 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:39:27 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:39:28 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:39:28 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:39:28 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:39:28 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:39:28 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:39:30 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:39:30 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:39:30 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:39:30 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:39:30 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:39:30 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:39:31 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:39:31 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:39:31 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:40:22 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:40:22 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:40:22 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:40:22 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:40:22 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:40:22 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:40:23 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:40:23 [INFO ] src.app: 启动 GUI
+08-02 13:40:45 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:40:45 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:41:58 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:41:58 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:41:58 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:41:58 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:41:58 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:41:58 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:41:58 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:41:59 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:41:59 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:42:29 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:42:29 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:42:29 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:42:29 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:42:29 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:42:29 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:42:30 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:42:30 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:42:30 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:43:31 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:43:31 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:43:31 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:43:31 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:43:31 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:43:31 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:43:32 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:43:32 [INFO ] src.app: 启动 GUI
+08-02 13:45:12 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:45:12 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:45:14 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:45:14 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:45:14 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:45:14 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:45:14 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:45:14 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:45:15 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:45:15 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:45:15 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:45:17 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:45:17 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:45:17 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:45:17 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:45:17 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:45:17 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:45:17 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:45:18 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:45:18 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:46:25 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:46:25 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:46:25 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:46:25 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:46:26 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:46:26 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:46:26 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:46:26 [INFO ] src.app: 启动 GUI
+08-02 13:46:28 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:46:28 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 13:46:30 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 13:46:30 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 13:46:30 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 13:46:30 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 13:46:30 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 13:46:30 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 13:46:31 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 13:46:31 [INFO ] src.app: 启动 GUI
+08-02 13:47:20 [INFO ] src.utils.coordinates: 坐标配置已保存: cache\coordinates.json
+08-02 13:47:21 [DEBUG] comtypes._post_coinit.unknwn: Calling CoUninitialize()
+08-02 13:47:21 [DEBUG] comtypes._post_coinit.unknwn: CoUninitialize() done.
+08-02 14:24:11 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 14:24:11 [DEBUG] comtypes: CoInitializeEx(None, 2)
+08-02 14:24:11 [INFO ] comtypes.client._code_cache: Imported existing <module 'comtypes.gen' from 'C:\\Users\\GOD\\AppData\\Roaming\\Python\\Python39\\site-packages\\comtypes\\gen\\__init__.py'>
+08-02 14:24:11 [INFO ] comtypes.client._code_cache: Using writeable comtypes cache directory: 'C:\Users\GOD\AppData\Roaming\Python\Python39\site-packages\comtypes\gen'
+08-02 14:24:11 [INFO ] src.driver.wechat_bridge: 已连接微信: hwnd=0x10A94, class='Qt51514QWindowIcon', title='微信'
+08-02 14:24:11 [INFO ] src.services.friend_service: 从缓存加载 5 位好友
+08-02 14:24:12 [INFO ] src.ui.main_window: 主窗口初始化完成
+08-02 14:24:12 [INFO ] src.app: 启动 GUI
+08-02 14:40:52 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 14:41:18 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 14:43:09 [INFO ] src.utils.logger: 日志系统初始化完成
+08-02 21:22:16 [INFO ] src.utils.logger: 日志系统初始化完成
