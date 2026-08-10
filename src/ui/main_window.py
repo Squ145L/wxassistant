@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class MainWindow:
 
-    def __init__(self):
+    def __init__(self, multi_session=None):
         self.root = tk.Tk()
         self.root.title(WINDOW_TITLE)
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
@@ -33,9 +33,13 @@ class MainWindow:
 
         self._friend_service = None
         self._bridge = None  # WeChatBridge，校准前用来打开对应窗口
+        self._multi_session = multi_session      # Optional[MultiAccountSession]
+        self._account_runtime: dict = {}          # name -> (bridge, friend_service)
+        self._account_var: Optional[tk.StringVar] = None
         self._on_send: Optional[Callable] = None
         self._on_check_names: Optional[Callable] = None
         self._on_search_contacts: Optional[Callable] = None
+        self._on_enter_multiopen: Optional[Callable] = None
         self._progress_queue: queue.Queue = queue.Queue()
         self._stop_event: Optional[threading.Event] = None
         self._interrupt_poll_active: bool = False
@@ -75,6 +79,41 @@ class MainWindow:
     def set_search_contacts_callback(self, callback: Callable):
         self._on_search_contacts = callback
 
+    def set_enter_multiopen_callback(self, callback: Callable) -> None:
+        self._on_enter_multiopen = callback
+
+    def set_account_runtime(self, runtime: dict) -> None:
+        """注入多账户运行时：{账户名: (bridge, friend_service)}"""
+        self._account_runtime = runtime
+        if self._multi_session and runtime:
+            first = self._multi_session.names[0]
+            self._account_var.set(first)
+            self._switch_account(first)
+
+    def get_current_bridge(self):
+        """返回当前账户的 bridge（多账户）；单账户返回 self._bridge"""
+        if self._account_runtime and self._account_var is not None:
+            name = self._account_var.get()
+            if name in self._account_runtime:
+                return self._account_runtime[name][0]
+        return self._bridge
+
+    def get_current_friend_service(self):
+        """返回当前账户的 friend_service（多账户）；单账户返回 self._friend_service"""
+        if self._account_runtime and self._account_var is not None:
+            name = self._account_var.get()
+            if name in self._account_runtime:
+                return self._account_runtime[name][1]
+        return self._friend_service
+
+    def _switch_account(self, name: str) -> None:
+        """切换到指定账户：换 bridge + friend_service"""
+        if name not in self._account_runtime:
+            return
+        bridge, service = self._account_runtime[name]
+        self.set_bridge(bridge)
+        self.set_friend_service(service)
+
     # ================================================================
     # UI 构建
     # ================================================================
@@ -91,9 +130,22 @@ class MainWindow:
         left = ttk.Frame(main_paned, width=LEFT_PANEL_WIDTH)
         main_paned.add(left, weight=0)
 
+        if self._multi_session is not None:
+            account_bar = ttk.Frame(left)
+            account_bar.pack(fill=tk.X, padx=4, pady=(4, 0))
+            ttk.Label(account_bar, text="账户:").pack(side=tk.LEFT)
+            self._account_var = tk.StringVar()
+            self._account_combo = ttk.Combobox(
+                account_bar, textvariable=self._account_var,
+                values=self._multi_session.names, state="readonly", width=14,
+            )
+            self._account_combo.pack(side=tk.LEFT, padx=(6, 0), fill=tk.X, expand=True)
+            self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
+
         self.filter_bar = FilterBar(left)
         self.filter_bar.pack(fill=tk.X)
         self.filter_bar.set_on_refresh(self._on_refresh)
+        self.filter_bar.set_on_multiopen(self._on_multiopen_clicked)
         self.filter_bar.set_on_tag_filter(self._on_tag_filter_changed)
         self.filter_bar.set_on_batch_tag(self._on_batch_tag_clicked)
         self.filter_bar.set_on_clear_tags(self._on_clear_tags_clicked)
@@ -288,16 +340,29 @@ class MainWindow:
             self._launch_calibrate(key)
         return False
 
+    def _on_account_selected(self, _event=None) -> None:
+        if self._account_var:
+            self._switch_account(self._account_var.get())
+
+    def _on_multiopen_clicked(self) -> None:
+        if self._on_enter_multiopen:
+            self._on_enter_multiopen()
+
     def _on_refresh(self) -> None:
-        """刷新按钮：清除所有红色标记 + 重新查找微信窗口（多开时切错窗口用）"""
+        """刷新按钮：清除所有红色标记 + 重新连接微信窗口"""
         self.friend_list.clear_failed_marks()
-        if self._bridge:
-            if self._bridge.find_window():
-                self.send_progress.set_status("已刷新 — 重新连接微信窗口")
+        if self._multi_session is not None:
+            # 多账户：不重找窗口（会破坏账户绑定），只校验当前窗口有效性
+            bridge = self.get_current_bridge()
+            if bridge.is_window_valid():
+                self.send_progress.set_status("已刷新 — 当前账户窗口有效")
             else:
-                self.send_progress.set_status("刷新失败 — 未找到微信窗口")
+                self.send_progress.set_status("刷新失败 — 当前账户窗口已失效，请重新进入多开")
+            return
+        if self._bridge.find_window():
+            self.send_progress.set_status("已刷新 — 重新连接微信窗口")
         else:
-            self.send_progress.set_status("已刷新")
+            self.send_progress.set_status("刷新失败 — 未找到微信窗口")
 
     def _on_check_names_clicked(self):
         selected = self.friend_list.get_selected()
