@@ -32,6 +32,12 @@ class FriendService:
         self._cache_path = Path(cache_path)
         self._friends: list[FriendDTO] = []
 
+    @classmethod
+    def for_account(cls, account_name: str) -> "FriendService":
+        """创建绑定到指定账户好友文件的实例（多开模式用）"""
+        from src.utils.account_paths import friends_path_for
+        return cls(cache_path=str(friends_path_for(account_name)))
+
     # ================================================================
     # 持久化
     # ================================================================
