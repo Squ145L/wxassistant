@@ -2,6 +2,9 @@
 
 账户切换 + [联系人▾][标签▾] 菜单 + 刷新/设置/帮助/多开。
 筛选（搜索/标签）留在内容区 FilterBar，这里不放筛选控件。
+
+注意：所有 command 用 _make_cmd / _make_cmd_arg，在点击时**运行时读取回调属性**，
+避免创建时（回调尚未注入）捕获到 None。
 """
 import tkinter as tk
 from tkinter import ttk
@@ -24,39 +27,61 @@ class TopBar(ttk.Frame):
         self._on_settings: Optional[Callable[[], None]] = None
         self._on_help: Optional[Callable[[], None]] = None
         self._on_multiopen: Optional[Callable[[], None]] = None
+        self._multi = False  # 多账户模式：账户下拉可切换
         self._build_ui()
+
+    # ================================================================
+    # command 辅助：运行时读取回调，防止创建时捕获 None
+    # ================================================================
+
+    def _make_cmd(self, attr):
+        def cmd():
+            cb = getattr(self, attr, None)
+            if cb:
+                cb()
+        return cmd
+
+    def _make_cmd_arg(self, attr, arg):
+        def cmd():
+            cb = getattr(self, attr, None)
+            if cb:
+                cb(arg)
+        return cmd
+
+    # ================================================================
+    # UI
+    # ================================================================
 
     def _build_ui(self) -> None:
         # ---- 账户（多账户模式显示）----
         self._account_label = ttk.Label(self, text="账户:")
-        self._account_combo = ttk.Combobox(self, state="readonly", width=12)
+        self._account_combo = ttk.Combobox(self, state="readonly", width=10)
 
         # ---- 联系人菜单 ----
         self._btn_contacts = ttk.Menubutton(self, text="联系人")
         contacts_menu = tk.Menu(self._btn_contacts, tearoff=0)
-        contacts_menu.add_command(label="检查选中名称", command=self._cb(self._on_check_names))
+        contacts_menu.add_command(label="检查选中名称", command=self._make_cmd("_on_check_names"))
         export_menu = tk.Menu(contacts_menu, tearoff=0)
         for fmt in ("txt", "csv", "json"):
             export_menu.add_command(
-                label=fmt.upper(),
-                command=lambda f=fmt: self._emit(self._on_export, f))
+                label=fmt.upper(), command=self._make_cmd_arg("_on_export", fmt))
         contacts_menu.add_cascade(label="导出选中联系人...", menu=export_menu)
-        contacts_menu.add_command(label="扫描并导入", command=self._cb(self._on_import_all))
-        contacts_menu.add_command(label="搜索并导入", command=self._cb(self._on_search_import))
+        contacts_menu.add_command(label="扫描并导入", command=self._make_cmd("_on_import_all"))
+        contacts_menu.add_command(label="搜索并导入", command=self._make_cmd("_on_search_import"))
         self._btn_contacts["menu"] = contacts_menu
 
         # ---- 标签菜单 ----
         self._btn_tags = ttk.Menubutton(self, text="标签")
         tags_menu = tk.Menu(self._btn_tags, tearoff=0)
-        tags_menu.add_command(label="添加标签", command=self._cb(self._on_batch_tag))
-        tags_menu.add_command(label="清除标签", command=self._cb(self._on_clear_tags))
+        tags_menu.add_command(label="添加标签", command=self._make_cmd("_on_batch_tag"))
+        tags_menu.add_command(label="清除标签", command=self._make_cmd("_on_clear_tags"))
         self._btn_tags["menu"] = tags_menu
 
         # ---- 右侧按钮 ----
-        self._btn_refresh = ttk.Button(self, text="刷新", width=5, command=self._cb(self._on_refresh))
-        self._btn_settings = ttk.Button(self, text="设置", width=5, command=self._cb(self._on_settings))
-        self._btn_help = ttk.Button(self, text="帮助", width=5, command=self._cb(self._on_help))
-        self._btn_multiopen = ttk.Button(self, text="多开", width=9, command=self._cb(self._on_multiopen))
+        self._btn_refresh = ttk.Button(self, text="刷新", width=4, command=self._make_cmd("_on_refresh"))
+        self._btn_settings = ttk.Button(self, text="设置", width=4, command=self._make_cmd("_on_settings"))
+        self._btn_help = ttk.Button(self, text="帮助", width=4, command=self._make_cmd("_on_help"))
+        self._btn_multiopen = ttk.Button(self, text="多开", width=7, command=self._make_cmd("_on_multiopen"))
 
         # pack 顺序：右侧按钮从右往左
         self._btn_multiopen.pack(side=tk.RIGHT, padx=(4, 2))
@@ -72,20 +97,6 @@ class TopBar(ttk.Frame):
         self.set_account_options(None)
 
     # ================================================================
-    # 辅助
-    # ================================================================
-
-    @staticmethod
-    def _cb(cb):
-        """菜单 command：点击时读取回调，避免创建时求值 None"""
-        return (lambda: cb() if cb else None)
-
-    @staticmethod
-    def _emit(cb, *args):
-        if cb:
-            cb(*args)
-
-    # ================================================================
     # 公开接口
     # ================================================================
 
@@ -96,6 +107,7 @@ class TopBar(ttk.Frame):
         account_var: tk.StringVar（由外部持有，MainWindow 读取当前账户）
         on_change: 切换账户回调 (name) -> None
         """
+        self._multi = bool(names)
         if names:
             self._account_label.pack(side=tk.LEFT)
             self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
@@ -108,8 +120,12 @@ class TopBar(ttk.Frame):
                 self._on_account_change = on_change
                 self._account_combo.bind("<<ComboboxSelected>>", self._on_combo_selected)
         else:
-            self._account_label.pack_forget()
-            self._account_combo.pack_forget()
+            # 单账户：显示"全局"（禁用），账户维度始终可见
+            self._account_label.pack(side=tk.LEFT)
+            self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
+            self._account_combo["values"] = ["全局"]
+            self._account_combo.set("全局")
+            self._account_combo.config(state="disabled")
 
     def _on_combo_selected(self, _event=None) -> None:
         if self._on_account_change:
@@ -124,10 +140,11 @@ class TopBar(ttk.Frame):
         state = tk.NORMAL if enabled else tk.DISABLED
         self._btn_refresh.config(state=state)
         self._btn_settings.config(state=state)
+        self._btn_help.config(state=state)
         self._btn_multiopen.config(state=state)
         self._btn_contacts.config(state=state)
         self._btn_tags.config(state=state)
-        if self._account_combo["values"]:
+        if self._multi:
             self._account_combo.config(state="readonly" if enabled else tk.DISABLED)
 
     # ---- 回调注入 ----

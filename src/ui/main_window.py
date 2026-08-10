@@ -31,7 +31,7 @@ class MainWindow:
         self.root = tk.Tk()
         self.root.title(WINDOW_TITLE)
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        self.root.minsize(900, 560)
+        self.root.minsize(960, 580)
 
         self._friend_service = None
         self._bridge = None  # WeChatBridge，校准前用来打开对应窗口

@@ -105,16 +105,18 @@ class SettingsDialog(tk.Toplevel):
         self._center(parent)
 
     def _build_ui(self) -> None:
-        # 账户行（多账户模式显示，切换 = 保存当前 + 重开对应账户的设置）
+        # 账户行（始终显示：多账户 = 可切下拉；单账户 = "全局"）
+        acct_row = ttk.Frame(self)
+        acct_row.pack(fill=tk.X, padx=8, pady=(8, 0))
+        ttk.Label(acct_row, text="账户:", font=("Microsoft YaHei", 9)).pack(side=tk.LEFT)
         if self._account_names:
-            acct_row = ttk.Frame(self)
-            acct_row.pack(fill=tk.X, padx=8, pady=(8, 0))
-            ttk.Label(acct_row, text="账户:", font=("Microsoft YaHei", 9)).pack(side=tk.LEFT)
             self._account_combo = ttk.Combobox(
                 acct_row, values=self._account_names, state="readonly", width=12)
             self._account_combo.set(self._account_name or self._account_names[0])
-            self._account_combo.pack(side=tk.LEFT, padx=(6, 0))
             self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
+        else:
+            self._account_combo = ttk.Label(acct_row, text="全局（单账户）", foreground="gray")
+        self._account_combo.pack(side=tk.LEFT, padx=(6, 0))
 
         nb = ttk.Notebook(self)
         self._nb = nb
