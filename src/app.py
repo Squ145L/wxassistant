@@ -135,6 +135,7 @@ def _build_window(multi_session=None):
     window = MainWindow(multi_session=multi_session)
 
     runtime: dict[str, tuple] = {}
+    all_hwnds = {acc.hwnd for acc in multi_session.accounts}
     for acc in multi_session.accounts:
         b = WeChatBridge()
         b._hwnd = acc.hwnd  # 绑定该账户窗口（不重新 find_window）
@@ -142,6 +143,8 @@ def _build_window(multi_session=None):
             window.suspend_interrupt_hook,
             window.resume_interrupt_hook,
         )
+        # 排除其他账户窗口，防止弹窗检测把别的账户主界面当"搜一搜"关掉
+        b.set_excluded_windows(all_hwnds - {acc.hwnd})
         fs = FriendService.for_account(acc.name)
         fs.load_cache()
         runtime[acc.name] = (b, fs)

@@ -66,6 +66,7 @@ class WeChatBridge:
         self._stop_check = None
         self._hook_suspend = None
         self._hook_resume = None
+        self._excluded_hwnds: set[int] = set()
 
     def set_stop_check(self, checker):
         self._stop_check = checker
@@ -74,6 +75,10 @@ class WeChatBridge:
         """注入钩子开关：SendKeys 前暂停钩子，之后恢复"""
         self._hook_suspend = suspend_fn
         self._hook_resume = resume_fn
+
+    def set_excluded_windows(self, hwnds):
+        """多账户：排除其他账户的主窗口，防止弹窗检测误关它们"""
+        self._excluded_hwnds = set(hwnds)
 
     def _should_stop(self) -> bool:
         if self._stop_check:
@@ -511,6 +516,9 @@ class WeChatBridge:
         def _enum(hwnd, _):
             nonlocal popup_hwnd
             if hwnd == self._hwnd:
+                return True
+            # 多账户：跳过其他已锁定账户的主窗口，防止把"微信"标题误判成搜一搜弹窗
+            if hwnd in self._excluded_hwnds:
                 return True
             if not win32gui.IsWindowVisible(hwnd):
                 return True
