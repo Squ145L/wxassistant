@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 # 群发回调
 # ================================================================
 
-def make_send_callback(bridge, template_engine, send_service):
-    """创建群发后台回调
+def make_send_callback(get_bridge, template_engine, send_service):
+    """创建群发后台回调（get_bridge: 可调用，返回当前账户的 WeChatBridge）
 
     流程：遍历好友 → 渲染 → 搜索 → OCR 验证 → 发送
     """
@@ -37,6 +37,7 @@ def make_send_callback(bridge, template_engine, send_service):
         interval: float, regex_pattern: str,
         progress_queue: queue.Queue, stop_event,
     ):
+        bridge = get_bridge()
         compiled_regex = None
         if regex_pattern:
             try:
@@ -113,10 +114,11 @@ def make_send_callback(bridge, template_engine, send_service):
 # 检查联系人名字回调
 # ================================================================
 
-def make_check_names_callback(bridge, friend_service):
-    """检查选中好友名称是否完整"""
+def make_check_names_callback(get_bridge, friend_service):
+    """检查选中好友名称是否完整（get_bridge: 返回当前账户 WeChatBridge）"""
 
     def do_check(friends: list, progress_queue: queue.Queue, stop_event):
+        bridge = get_bridge()
         bridge.set_stop_check(lambda: stop_event.is_set())
         diffs: dict[str, str] = {}
         failed: dict[str, str] = {}
@@ -305,10 +307,11 @@ def _cleanup_temp_scan(progress_queue) -> None:
 # 导入回调
 # ================================================================
 
-def make_search_contacts_callback(bridge, friend_service):
-    """搜索并导入 / 扫描通讯录并导入"""
+def make_search_contacts_callback(get_bridge, friend_service):
+    """搜索并导入 / 扫描通讯录并导入（get_bridge: 返回当前账户 WeChatBridge）"""
 
     def do_search(keyword: str, progress_queue: queue.Queue, stop_event):
+        bridge = get_bridge()
         bridge.set_stop_check(lambda: stop_event.is_set())
         try:
             # 阶段1: 截图（鼠标中断可触发）
