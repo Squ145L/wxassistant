@@ -19,6 +19,7 @@ from src.ui.friend_list import FriendList
 from src.ui.message_editor import MessageEditor
 from src.ui.send_progress import SendProgress
 from src.ui.result_dialog import ResultDialog
+from src.ui.top_bar import TopBar
 from src.services.multi_account import find_overlapping_accounts
 
 logger = logging.getLogger(__name__)
@@ -48,8 +49,6 @@ class MainWindow:
 
         self._build_ui()
         self._wire_events()
-        if self._multi_session is not None:
-            self.filter_bar.set_multiopen_label(True)
         self._poll_progress_queue()
 
         # 任意键/鼠标点击中断（仅在操作进行中生效）
@@ -127,6 +126,27 @@ class MainWindow:
     # ================================================================
 
     def _build_ui(self):
+        # 顶栏（窗口级操作：账户/联系人/标签/刷新/设置/多开）
+        self.top_bar = TopBar(self.root)
+        self.top_bar.pack(fill=tk.X, side=tk.TOP, padx=6, pady=(6, 0))
+        self.top_bar.set_on_account_change(self._on_account_selected)
+        self.top_bar.set_on_check_names(self._on_check_names_clicked)
+        self.top_bar.set_on_export(self._on_export_clicked)
+        self.top_bar.set_on_import_all(self._on_import_all_clicked)
+        self.top_bar.set_on_search_import(self._on_search_contacts_clicked)
+        self.top_bar.set_on_batch_tag(self._on_batch_tag_clicked)
+        self.top_bar.set_on_clear_tags(self._on_clear_tags_clicked)
+        self.top_bar.set_on_refresh(self._on_refresh)
+        self.top_bar.set_on_settings(self._open_settings)
+        self.top_bar.set_on_help(self._on_help_clicked)
+        self.top_bar.set_on_multiopen(self._on_multiopen_clicked)
+
+        if self._multi_session is not None:
+            self._account_var = tk.StringVar()
+            self.top_bar.set_account_options(
+                self._multi_session.names, self._account_var, self._on_account_selected)
+            self.top_bar.set_multiopen_label(True)
+
         # 底部先 pack（确保不被挤出）
         self.send_progress = SendProgress(self.root)
         self.send_progress.pack(fill=tk.X, side=tk.BOTTOM, padx=6, pady=(0, 6))
@@ -138,25 +158,9 @@ class MainWindow:
         left = ttk.Frame(main_paned, width=LEFT_PANEL_WIDTH)
         main_paned.add(left, weight=0)
 
-        if self._multi_session is not None:
-            account_bar = ttk.Frame(left)
-            account_bar.pack(fill=tk.X, padx=4, pady=(4, 0))
-            ttk.Label(account_bar, text="账户:").pack(side=tk.LEFT)
-            self._account_var = tk.StringVar()
-            self._account_combo = ttk.Combobox(
-                account_bar, textvariable=self._account_var,
-                values=self._multi_session.names, state="readonly", width=14,
-            )
-            self._account_combo.pack(side=tk.LEFT, padx=(6, 0), fill=tk.X, expand=True)
-            self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
-
         self.filter_bar = FilterBar(left)
         self.filter_bar.pack(fill=tk.X)
-        self.filter_bar.set_on_refresh(self._on_refresh)
-        self.filter_bar.set_on_multiopen(self._on_multiopen_clicked)
         self.filter_bar.set_on_tag_filter(self._on_tag_filter_changed)
-        self.filter_bar.set_on_batch_tag(self._on_batch_tag_clicked)
-        self.filter_bar.set_on_clear_tags(self._on_clear_tags_clicked)
 
         self.friend_list = FriendList(left)
         self.friend_list.pack(fill=tk.BOTH, expand=True)
@@ -169,12 +173,6 @@ class MainWindow:
 
     def _wire_events(self):
         self.filter_bar.bind("<<FilterChanged>>", lambda _e: self._apply_filter())
-        self.filter_bar.set_on_calibrate(self._launch_calibrate)
-        self.filter_bar.set_on_check_names(self._on_check_names_clicked)
-        self.filter_bar.set_on_search_contacts(self._on_search_contacts_clicked)
-        self.filter_bar.set_on_import_all(self._on_import_all_clicked)
-        self.filter_bar.set_on_import_settings(self._on_import_settings_clicked)
-        self.filter_bar.set_on_help(self._on_help_clicked)
         self.friend_list.set_callbacks(
             on_add=self._handle_add,
             on_delete=self._handle_delete,
@@ -513,6 +511,16 @@ class MainWindow:
     def _on_import_settings_clicked(self):
         self._open_settings("OCR")
 
+    def _on_export_clicked(self, fmt: str) -> None:
+        """导出选中联系人（fmt: txt/csv/json）"""
+        selected = self.friend_list.get_selected()
+        if not selected:
+            messagebox.showinfo("提示", "请先勾选要导出的联系人。")
+            return
+        from src.services.export_service import export_friends
+        path = export_friends(selected, fmt, self._current_account_name())
+        messagebox.showinfo("导出完成", f"已导出 {len(selected)} 位联系人到：\n{path}")
+
     def _current_account_name(self) -> Optional[str]:
         """当前账户名（多账户）；单账户返回 None"""
         if self._multi_session is not None and self._account_var:
@@ -755,6 +763,7 @@ class MainWindow:
     def _set_ui_sending(self, sending: bool):
         self.send_progress.set_running(sending)
         self.filter_bar.set_enabled(not sending)
+        self.top_bar.set_enabled(not sending)
         self.message_editor.set_enabled(not sending)
         if sending:
             self.friend_list.select_none()
