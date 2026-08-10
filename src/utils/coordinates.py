@@ -6,7 +6,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -56,37 +56,55 @@ COORD_GROUPS = [
 ]
 
 
-def load_coordinates() -> dict[str, Tuple[float, float]]:
-    """加载坐标配置：用户自定义优先，fallback 默认值"""
+def _coordinates_path(account_name: Optional[str] = None) -> Path:
+    """账户专属坐标文件；account_name 为空则用全局文件"""
+    if account_name:
+        from src.utils.account_paths import coordinates_path_for
+        return coordinates_path_for(account_name)
+    return COORDINATES_PATH
+
+
+def _apply_coord_file(merged: dict, path: Path) -> None:
+    """把坐标文件合并进 merged（文件存在才读）"""
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for key, value in data.items():
+            if key in DEFAULT_COORDINATES and isinstance(value, list) and len(value) == 2:
+                merged[key] = (float(value[0]), float(value[1]))
+    except Exception:
+        logger.warning("坐标配置文件读取失败，使用默认值: %s", path, exc_info=True)
+
+
+def load_coordinates(account_name: Optional[str] = None) -> dict[str, Tuple[float, float]]:
+    """加载坐标配置：全局文件 → 账户专属文件覆盖 → 默认值兜底"""
     merged = dict(DEFAULT_COORDINATES)
-    if COORDINATES_PATH.exists():
-        try:
-            data = json.loads(COORDINATES_PATH.read_text(encoding="utf-8"))
-            for key, value in data.items():
-                if key in DEFAULT_COORDINATES and isinstance(value, list) and len(value) == 2:
-                    merged[key] = (float(value[0]), float(value[1]))
-        except Exception:
-            logger.warning("坐标配置文件读取失败，使用默认值", exc_info=True)
+    _apply_coord_file(merged, COORDINATES_PATH)                       # 全局
+    if account_name:
+        _apply_coord_file(merged, _coordinates_path(account_name))     # 账户覆盖
     return merged
 
 
-def save_coordinates(coords: dict[str, Tuple[float, float]]) -> None:
-    """保存坐标配置到文件"""
-    COORDINATES_PATH.parent.mkdir(parents=True, exist_ok=True)
+def save_coordinates(coords: dict[str, Tuple[float, float]],
+                     account_name: Optional[str] = None) -> None:
+    """保存坐标配置到文件（账户专属或全局）"""
+    path = _coordinates_path(account_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
     serializable = {k: [v[0], v[1]] for k, v in coords.items()}
-    COORDINATES_PATH.write_text(
+    path.write_text(
         json.dumps(serializable, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    logger.info("坐标配置已保存: %s", COORDINATES_PATH)
+    logger.info("坐标配置已保存: %s", path)
 
 
-def get_coord(key: str) -> Tuple[float, float]:
-    """获取单个坐标（从文件加载，fallback 默认值）
+def get_coord(key: str, account_name: Optional[str] = None) -> Tuple[float, float]:
+    """获取单个坐标（账户优先，fallback 全局/默认值）
 
     Returns: (x_pct, y_pct) 窗口内百分比
     """
-    coords = load_coordinates()
+    coords = load_coordinates(account_name)
     if key in coords:
         return coords[key]
     logger.warning("未知坐标 key: %s，使用安全区默认值", key)
