@@ -116,39 +116,43 @@ def make_check_names_callback(get_bridge, friend_service):
     """检查选中好友名称是否完整（get_bridge: 返回当前账户 WeChatBridge）"""
 
     def do_check(friends: list, progress_queue: queue.Queue, stop_event):
-        bridge = get_bridge()
-        bridge.set_stop_check(lambda: stop_event.is_set())
-        diffs: dict[str, str] = {}
-        failed: dict[str, str] = {}
+        try:
+            bridge = get_bridge()
+            bridge.set_stop_check(lambda: stop_event.is_set())
+            diffs: dict[str, str] = {}
+            failed: dict[str, str] = {}
 
-        for friend in friends:
-            if stop_event.is_set():
-                progress_queue.put(("__LOG__", "已中断"))
-                break
-            name = friend.name
-            try:
-                found = bridge.search_contacts(name)
-                if not found:
-                    if not stop_event.is_set():
-                        logger.info("检查名字: '%s' — 搜不到", name)
-                        failed[name] = "搜索失败"
-                    continue
+            for friend in friends:
+                if stop_event.is_set():
+                    progress_queue.put(("__LOG__", "已中断"))
+                    break
+                name = friend.name
+                try:
+                    found = bridge.search_contacts(name)
+                    if not found:
+                        if not stop_event.is_set():
+                            logger.info("检查名字: '%s' — 搜不到", name)
+                            failed[name] = "搜索失败"
+                        continue
 
-                matched, ocr_name = bridge.match_chat_title(name)
-                if matched and ocr_name and ocr_name != name:
-                    logger.info("检查名字: '%s' -> '%s'", name, ocr_name)
-                    diffs[name] = ocr_name
-                    failed[name] = f"'{ocr_name}' (expected='{name}')"
-                elif not matched:
-                    logger.info("检查名字: '%s' — OCR 不匹配 '%s'", name, ocr_name)
-                    failed[name] = f"'{ocr_name}' (expected='{name}')"
-                else:
-                    logger.info("检查名字: '%s' — 已完整", name)
+                    matched, ocr_name = bridge.match_chat_title(name)
+                    if matched and ocr_name and ocr_name != name:
+                        logger.info("检查名字: '%s' -> '%s'", name, ocr_name)
+                        diffs[name] = ocr_name
+                        failed[name] = f"'{ocr_name}' (expected='{name}')"
+                    elif not matched:
+                        logger.info("检查名字: '%s' — OCR 不匹配 '%s'", name, ocr_name)
+                        failed[name] = f"'{ocr_name}' (expected='{name}')"
+                    else:
+                        logger.info("检查名字: '%s' — 已完整", name)
 
-            except Exception as e:
-                logger.exception("检查名字异常: '%s'", name)
+                except Exception as e:
+                    logger.exception("检查名字异常: '%s'", name)
 
-        progress_queue.put(("__NAME_CHECK_DONE__", diffs, failed))
+            progress_queue.put(("__NAME_CHECK_DONE__", diffs, failed))
+        except Exception:
+            logger.exception("检查流程异常")
+            progress_queue.put(("__NAME_CHECK_DONE__", {}, {}))
 
     return do_check
 
@@ -345,7 +349,7 @@ def make_search_contacts_callback(get_bridge, friend_service):
         except Exception as e:
             logger.exception("操作异常")
             progress_queue.put(("__LOG__", f"❌ 错误: {e}"))
-            progress_queue.put(("__NAME_CHECK_DONE__", {}))
+            progress_queue.put(("__NAME_CHECK_DONE__", {}, {}))
 
     return do_search
 

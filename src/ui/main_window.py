@@ -48,6 +48,7 @@ class MainWindow:
         self._progress_queue: queue.Queue = queue.Queue()
         self._stop_event: Optional[threading.Event] = None
         self._interrupt_poll_active: bool = False
+        self._busy: bool = False
 
         self._build_ui()
         self._wire_events()
@@ -382,13 +383,15 @@ class MainWindow:
             self.send_progress.set_status("刷新失败 — 未找到微信窗口")
 
     def _on_check_names_clicked(self):
+        if not self._ensure_not_busy():
+            return
         selected = self.friend_list.get_selected()
         if not selected:
             messagebox.showinfo("提示", "请先勾选要检查的好友。")
             return
         if not self._on_check_names:
             return
-        self._set_ops_active(False)
+        self._set_busy(True)
         self._stop_event = threading.Event()
         self._interrupt_poll_active = True
         self._was_interrupted = False
@@ -397,6 +400,8 @@ class MainWindow:
         threading.Thread(target=self._on_check_names, args=(selected, self._progress_queue, self._stop_event), daemon=True).start()
 
     def _on_search_contacts_clicked(self):
+        if not self._ensure_not_busy():
+            return
         if not self._ensure_calibration("contacts_list"):
             return
         if not self._on_search_contacts:
@@ -407,7 +412,7 @@ class MainWindow:
             return
         self.send_progress.set_status("正在搜索并导入...")
         self.send_progress.append_log(f"搜索: '{kw}'")
-        self._set_ops_active(False)
+        self._set_busy(True)
         self._stop_event = threading.Event()
         self._interrupt_poll_active = True
         self._was_interrupted = False
@@ -417,6 +422,8 @@ class MainWindow:
                          daemon=True).start()
 
     def _on_import_all_clicked(self):
+        if not self._ensure_not_busy():
+            return
         if not self._ensure_calibration("contacts_list"):
             return
         if not self._on_search_contacts:
@@ -427,7 +434,7 @@ class MainWindow:
             return
         self.send_progress.set_status("正在扫描通讯录...")
         self.send_progress.clear_log()
-        self._set_ops_active(False)
+        self._set_busy(True)
         self._stop_event = threading.Event()
         self._interrupt_poll_active = True
         self._was_interrupted = False
@@ -602,6 +609,8 @@ class MainWindow:
         )
 
     def _on_start_send(self):
+        if not self._ensure_not_busy():
+            return
         selected = self.friend_list.get_selected()
         if not selected:
             messagebox.showwarning("提示", "请先选择要发送的好友。")
@@ -770,6 +779,7 @@ class MainWindow:
         logger.info("用户请求终止")
 
     def _set_ui_sending(self, sending: bool):
+        self._set_busy(sending)
         self.send_progress.set_running(sending)
         self.filter_bar.set_enabled(not sending)
         self.top_bar.set_enabled(not sending)
@@ -777,9 +787,17 @@ class MainWindow:
         if sending:
             self.friend_list.select_none()
 
-    def _set_ops_active(self, active: bool) -> None:
-        """检查/搜索/导入操作期间锁定账户选择器，防止用户中途切换账户"""
-        self.top_bar.set_account_enabled(active)
+    def _set_busy(self, busy: bool) -> None:
+        """标记任一后台操作（发送/检查/扫描/导入）占用；busy=True 锁定账户下拉"""
+        self._busy = busy
+        self.top_bar.set_account_enabled(not busy)
+
+    def _ensure_not_busy(self) -> bool:
+        """有后台操作进行中则提示并返回 False"""
+        if self._busy:
+            messagebox.showinfo("提示", "有操作正在进行，请等待完成或中断后再试。")
+            return False
+        return True
 
     # ================================================================
     # 进度队列轮询
@@ -844,7 +862,6 @@ class MainWindow:
         elif msg_type == "__INTERRUPT_OFF__":
             self._interrupt_poll_active = False
             self._stop_event = None
-            self._set_ops_active(True)
 
         elif msg_type == "__SCAN_DONE_FOCUS__":
             _, page_count = msg
@@ -868,10 +885,14 @@ class MainWindow:
             dlg.set_on_confirm(_import_selected)
 
         elif msg_type == "__NAME_CHECK_DONE__":
-            _, diffs, failed = msg
+            diffs, failed = {}, {}
+            if len(msg) >= 3:
+                diffs, failed = msg[1], msg[2]
+            elif len(msg) == 2:
+                diffs = msg[1]
             self._interrupt_poll_active = False
             self._stop_event = None
-            self._set_ops_active(True)
+            self._set_busy(False)
             self.send_progress.set_status("就绪")
             self.send_progress.set_running(False)
             self.friend_list.mark_failed(failed)
