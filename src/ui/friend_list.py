@@ -116,7 +116,7 @@ class FriendList(ttk.Frame):
         ttk.Button(actions, text="反选", width=4, command=self.invert_selection).pack(
             side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         # 标签▾ 菜单（添加/清除标签，从顶栏下沉；普通按钮外观 + tk_popup 展开）
-        self._btn_tags = ttk.Button(actions, text="标签 ▾")
+        self._btn_tags = ttk.Button(actions, text="标签...", width=7)
         tags_menu = tk.Menu(self._btn_tags, tearoff=0)
         tags_menu.add_command(label="添加标签", command=self._on_batch_tag_clicked)
         tags_menu.add_command(label="清除标签", command=self._on_clear_tags_clicked)

@@ -59,7 +59,7 @@ class TopBar(ttk.Frame):
         self._account_combo = ttk.Combobox(self, state="readonly", width=10)
 
         # ---- 联系人菜单（普通按钮外观 + tk_popup 展开；Menubutton 原生样式怪异故不用）----
-        self._btn_contacts = ttk.Button(self, text="联系人 ▾")
+        self._btn_contacts = ttk.Button(self, text="联系人...", width=7)
         contacts_menu = tk.Menu(self._btn_contacts, tearoff=0)
         contacts_menu.add_command(label="检查选中名称", command=self._make_cmd("_on_check_names"))
         export_menu = tk.Menu(contacts_menu, tearoff=0)
