@@ -24,11 +24,82 @@ logger = logging.getLogger(__name__)
 # 群发回调
 # ================================================================
 
-def make_send_callback(get_bridge, template_engine, send_service):
-    """创建群发后台回调（get_bridge: 可调用，返回当前账户的 WeChatBridge）
+def _send_friends(bridge, friends: list, message_template: str, attachments: list[str],
+                  interval: float, regex_pattern: str,
+                  progress_queue: queue.Queue, stop_event,
+                  template_engine, send_service):
+    """单账户发送核心：遍历好友 → 渲染 → 搜索 → OCR 验证 → 发送。返回 send_batch 结果。"""
+    compiled_regex = None
+    if regex_pattern:
+        try:
+            compiled_regex = re.compile(regex_pattern)
+        except re.error:
+            pass
 
-    流程：遍历好友 → 渲染 → 搜索 → OCR 验证 → 发送
-    """
+    bridge.set_stop_check(lambda: stop_event.is_set())
+
+    def _stopped():
+        return stop_event.is_set()
+
+    def send_one(friend) -> SendResult:
+        if _stopped():
+            return SendResult(friend_name=friend.name, success=False, error="已中断")
+
+        name = friend.name
+        try:
+            regex_match = compiled_regex.search(name) if compiled_regex else None
+            rendered = template_engine.render(message_template, friend, regex_match=regex_match)
+
+            if _stopped():
+                return SendResult(friend_name=name, success=False, error="已中断")
+
+            found = bridge.search_contacts(name)
+            if not found:
+                return SendResult(friend_name=name, success=False, error="联系人不存在(搜索弹窗已关闭)")
+
+            if _stopped():
+                return SendResult(friend_name=name, success=False, error="已中断")
+
+            matched, _ = bridge.match_chat_title(name)
+            if not matched:
+                return SendResult(friend_name=name, success=False, error="OCR验证失败: 聊天对象不匹配")
+
+            if _stopped():
+                return SendResult(friend_name=name, success=False, error="已中断")
+
+            if rendered.strip():
+                bridge.send_text_message(rendered)
+
+            for filepath in attachments:
+                if _stopped():
+                    return SendResult(friend_name=name, success=False, error="已中断")
+                bridge.send_file_message(filepath)
+
+            return SendResult(friend_name=name, success=True)
+
+        except Exception as e:
+            logger.exception("发送失败: %s", name)
+            return SendResult(friend_name=name, success=False, error=str(e))
+
+    def on_progress(current: int, total: int, result: SendResult):
+        progress_queue.put((
+            "__PROGRESS__",
+            current, total,
+            current - (1 if result and not result.success else 0),
+            1 if result and not result.success else 0,
+            result.friend_name if result else "",
+            result.error if result and not result.success else None,
+        ))
+
+    send_service._stop_event = stop_event
+    send_service.base_interval = interval
+    batch = send_service.send_batch(friends=friends, send_one=send_one, on_progress=on_progress)
+    send_service.reset()
+    return batch
+
+
+def make_send_callback(get_bridge, template_engine, send_service):
+    """创建群发后台回调（get_bridge: 可调用，返回当前账户的 WeChatBridge）"""
 
     def do_send(
         friends: list, message_template: str, attachments: list[str],
@@ -36,76 +107,48 @@ def make_send_callback(get_bridge, template_engine, send_service):
         progress_queue: queue.Queue, stop_event,
     ):
         bridge = get_bridge()
-        compiled_regex = None
-        if regex_pattern:
-            try:
-                compiled_regex = re.compile(regex_pattern)
-            except re.error:
-                pass
-
-        bridge.set_stop_check(lambda: stop_event.is_set())
-
-        def _stopped():
-            return stop_event.is_set()
-
-        def send_one(friend) -> SendResult:
-            if _stopped():
-                return SendResult(friend_name=friend.name, success=False, error="已中断")
-
-            name = friend.name
-            try:
-                regex_match = compiled_regex.search(name) if compiled_regex else None
-                rendered = template_engine.render(message_template, friend, regex_match=regex_match)
-
-                if _stopped():
-                    return SendResult(friend_name=name, success=False, error="已中断")
-
-                found = bridge.search_contacts(name)
-                if not found:
-                    return SendResult(friend_name=name, success=False, error="联系人不存在(搜索弹窗已关闭)")
-
-                if _stopped():
-                    return SendResult(friend_name=name, success=False, error="已中断")
-
-                matched, _ = bridge.match_chat_title(name)
-                if not matched:
-                    return SendResult(friend_name=name, success=False, error="OCR验证失败: 聊天对象不匹配")
-
-                if _stopped():
-                    return SendResult(friend_name=name, success=False, error="已中断")
-
-                if rendered.strip():
-                    bridge.send_text_message(rendered)
-
-                for filepath in attachments:
-                    if _stopped():
-                        return SendResult(friend_name=name, success=False, error="已中断")
-                    bridge.send_file_message(filepath)
-
-                return SendResult(friend_name=name, success=True)
-
-            except Exception as e:
-                logger.exception("发送失败: %s", name)
-                return SendResult(friend_name=name, success=False, error=str(e))
-
-        def on_progress(current: int, total: int, result: SendResult):
-            progress_queue.put((
-                "__PROGRESS__",
-                current, total,
-                current - (1 if result and not result.success else 0),
-                1 if result and not result.success else 0,
-                result.friend_name if result else "",
-                result.error if result and not result.success else None,
-            ))
-
-        send_service._stop_event = stop_event
-        send_service.base_interval = interval
-        batch = send_service.send_batch(friends=friends, send_one=send_one, on_progress=on_progress)
-
+        batch = _send_friends(bridge, friends, message_template, attachments,
+                              interval, regex_pattern, progress_queue, stop_event,
+                              template_engine, send_service)
         progress_queue.put(("__DONE__", batch.success, batch.failed, batch.failed_list, batch.results))
-        send_service.reset()
 
     return do_send
+
+
+def make_multi_send_callback(get_runtime, template_engine, send_service):
+    """多账户群发：对每个账户的勾选名单，依次用该账户的 bridge 发送，最后汇总一次 __DONE__
+
+    get_runtime: () -> {账户名: (bridge, friend_service)}
+    do_multi_send(selected_per_account: dict, ...)  selected_per_account: {账户名: [好友]}
+    """
+
+    def do_multi_send(
+        selected_per_account: dict, message_template: str, attachments: list[str],
+        interval: float, regex_pattern: str,
+        progress_queue: queue.Queue, stop_event,
+    ):
+        runtime = get_runtime()
+        all_success = 0
+        all_failed = 0
+        all_failed_list = []
+        all_results = []
+        for name, friends in selected_per_account.items():
+            if not friends or stop_event.is_set():
+                continue
+            item = runtime.get(name)
+            if item is None:
+                continue
+            bridge, _fs = item
+            batch = _send_friends(bridge, friends, message_template, attachments,
+                                  interval, regex_pattern, progress_queue, stop_event,
+                                  template_engine, send_service)
+            all_success += batch.success
+            all_failed += batch.failed
+            all_failed_list.extend(batch.failed_list)
+            all_results.extend(batch.results)
+        progress_queue.put(("__DONE__", all_success, all_failed, all_failed_list, all_results))
+
+    return do_multi_send
 
 
 # ================================================================

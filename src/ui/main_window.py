@@ -40,6 +40,7 @@ class MainWindow:
         self._bridge = None  # WeChatBridge，校准前用来打开对应窗口
         self._multi_session = multi_session      # Optional[MultiAccountSession]
         self._account_runtime: dict = {}          # name -> (bridge, friend_service)
+        self._account_selection: dict[str, set] = {}  # 每个账户已勾选的联系人名（跨账户保留）
         self._account_var: Optional[tk.StringVar] = None
         self._on_send: Optional[Callable] = None
         self._on_check_names: Optional[Callable] = None
@@ -123,15 +124,45 @@ class MainWindow:
         return self._friend_service
 
     def _switch_account(self, name: str) -> None:
-        """切换到指定账户：换 bridge + friend_service（不可跨账户多选，清空勾选）"""
+        """切换到指定账户：换 bridge + friend_service（各账户勾选独立保留，可跨账户多选）"""
         if name not in self._account_runtime:
             return
+        self._save_current_selection()   # 保存当前账户勾选
+        if self._account_var is not None:
+            self._account_var.set(name)   # 同步当前账户（下拉/直接调用都一致）
         bridge, service = self._account_runtime[name]
         self.set_bridge(bridge)
         self.set_friend_service(service)
+        # 恢复该账户之前勾选的联系人
         self.friend_list.select_none()
-        # 清空上一条账户残留的搜索/正则/标签筛选，再刷新到当前账户全量列表
+        saved = self._account_selection.get(name, set())
+        if saved:
+            self.friend_list.set_checked_by_names(saved, True)
+        self.friend_list._update_select_all_sync()
+        # 清空筛选文字，刷新到当前账户全量列表
         self.friend_list.clear_filter()
+
+    def _save_current_selection(self) -> None:
+        """把当前账户已勾选的联系人名存入 _account_selection（跨账户保留）"""
+        name = self._current_account_name()
+        if not name:
+            return
+        self._account_selection[name] = {f.name for f in self.friend_list.get_selected()}
+
+    def _gather_multi_selection(self) -> dict[str, list]:
+        """多开：收集所有账户已勾选的联系人 {账户名: [好友]}，用于跨账户群发"""
+        self._save_current_selection()
+        result: dict[str, list] = {}
+        for name, (_bridge, fs) in self._account_runtime.items():
+            checked = self._account_selection.get(name, set())
+            friends = [f for f in fs.all_friends if f.name in checked]
+            if friends:
+                result[name] = friends
+        return result
+
+    def get_account_runtime(self) -> dict:
+        """返回账户运行时 {账户名: (bridge, friend_service)}（多账户发送用）"""
+        return self._account_runtime
 
     # ================================================================
     # UI 构建
@@ -716,10 +747,19 @@ class MainWindow:
     def _on_start_send(self):
         if not self._ensure_not_busy():
             return
-        selected = self.friend_list.get_selected()
-        if not selected:
-            messagebox.showwarning("提示", "请先选择要发送的好友。")
-            return
+        if self._multi_session is not None:
+            # 多开：收集所有账户已勾选的联系人（可跨账户）
+            selected = self._gather_multi_selection()   # {账户名: [好友]}
+            total = sum(len(v) for v in selected.values())
+            if not selected:
+                messagebox.showwarning("提示", "请先在各个账户中勾选要发送的联系人。")
+                return
+        else:
+            selected = self.friend_list.get_selected()
+            total = len(selected)
+            if not selected:
+                messagebox.showwarning("提示", "请先选择要发送的好友。")
+                return
 
         message = self.message_editor.get_message()
         if not message.strip():
@@ -739,9 +779,9 @@ class MainWindow:
         regex_pattern = self.friend_list.filter_text if self.friend_list.is_regex_mode else ""
 
         logger.info("发起群发: %d 人, 间隔 %.1fs, %d 附件",
-                     len(selected), interval, len(attachments))
+                     total, interval, len(attachments))
 
-        if not messagebox.askyesno("确认发送", f"将向 {len(selected)} 位好友发送消息，确认开始？"):
+        if not messagebox.askyesno("确认发送", f"将向 {total} 位好友发送消息，确认开始？"):
             return
 
         self._set_ui_sending(True)
