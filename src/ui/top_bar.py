@@ -58,8 +58,8 @@ class TopBar(ttk.Frame):
         self._account_label = ttk.Label(self, text="账户:")
         self._account_combo = ttk.Combobox(self, state="readonly", width=10)
 
-        # ---- 联系人菜单 ----
-        self._btn_contacts = ttk.Menubutton(self, text="联系人")
+        # ---- 联系人菜单（普通按钮外观 + tk_popup 展开；Menubutton 原生样式怪异故不用）----
+        self._btn_contacts = ttk.Button(self, text="联系人 ▾")
         contacts_menu = tk.Menu(self._btn_contacts, tearoff=0)
         contacts_menu.add_command(label="检查选中名称", command=self._make_cmd("_on_check_names"))
         export_menu = tk.Menu(contacts_menu, tearoff=0)
@@ -69,12 +69,8 @@ class TopBar(ttk.Frame):
         contacts_menu.add_cascade(label="导出选中联系人...", menu=export_menu)
         contacts_menu.add_command(label="扫描并导入", command=self._make_cmd("_on_import_all"))
         contacts_menu.add_command(label="搜索并导入", command=self._make_cmd("_on_search_import"))
-        self._btn_contacts["menu"] = contacts_menu
-
-        # toggle：点开/再点或点别处收起（tk_popup 阻塞式，天然满足）
-        # 标签▾ 已下沉到好友列表操作行（添加/清除标签）
-        self._btn_contacts.bind(
-            "<Button-1>", lambda e: self._toggle_menu(self._btn_contacts, contacts_menu))
+        self._btn_contacts.config(
+            command=lambda: self._toggle_menu(self._btn_contacts, contacts_menu))
 
         # ---- 右侧按钮 ----
         self._btn_refresh = ttk.Button(self, text="刷新", width=4, command=self._make_cmd("_on_refresh"))
@@ -127,7 +123,7 @@ class TopBar(ttk.Frame):
         if self._on_account_change:
             self._on_account_change(self._account_combo.get())
 
-    def _toggle_menu(self, btn: ttk.Menubutton, menu: tk.Menu) -> str:
+    def _toggle_menu(self, btn: ttk.Widget, menu: tk.Menu) -> str:
         """[联系人]/[标签] 点击：弹出菜单（tk_popup 阻塞式）
 
         tk_popup 带 grab：再点按钮或点菜单外任意处即收起并返回。

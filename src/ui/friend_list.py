@@ -68,7 +68,7 @@ class FriendList(ttk.Frame):
         if self._on_clear_tags:
             self._on_clear_tags()
 
-    def _toggle_menu(self, btn: ttk.Menubutton, menu: tk.Menu) -> str:
+    def _toggle_menu(self, btn: ttk.Widget, menu: tk.Menu) -> str:
         """标签▾ 点击：tk_popup 阻塞式（再点/点别处即收起）"""
         try:
             menu.tk_popup(btn.winfo_rootx(), btn.winfo_rooty() + btn.winfo_height())
@@ -115,14 +115,14 @@ class FriendList(ttk.Frame):
         self._cb_select_all.pack(side=tk.LEFT)
         ttk.Button(actions, text="反选", width=4, command=self.invert_selection).pack(
             side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
-        # 标签▾ 菜单（添加/清除标签，从顶栏下沉）
-        self._btn_tags = ttk.Menubutton(actions, text="标签")
+        # 标签▾ 菜单（添加/清除标签，从顶栏下沉；普通按钮外观 + tk_popup 展开）
+        self._btn_tags = ttk.Button(actions, text="标签 ▾")
         tags_menu = tk.Menu(self._btn_tags, tearoff=0)
         tags_menu.add_command(label="添加标签", command=self._on_batch_tag_clicked)
         tags_menu.add_command(label="清除标签", command=self._on_clear_tags_clicked)
-        self._btn_tags["menu"] = tags_menu
+        self._btn_tags.config(
+            command=lambda: self._toggle_menu(self._btn_tags, tags_menu))
         self._btn_tags.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
-        self._btn_tags.bind("<Button-1>", lambda e: self._toggle_menu(self._btn_tags, tags_menu))
         ui_kit.Spacer(actions).pack(side=tk.LEFT, fill=tk.X, expand=True)
         # 右侧（从右往左 pack）：删除 ➕ 已选x/y
         ttk.Button(actions, text="删除", style="Danger.TButton", width=4,
