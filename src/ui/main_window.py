@@ -10,10 +10,10 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Optional, Callable
 
-from src.utils.calibration import calibration_has_key
 from src.utils.config import (
     WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, LEFT_PANEL_WIDTH, LEFT_MIN_PANEL_WIDTH,
 )
+from src.utils import guidance
 from src.utils.coordinates import get_coord
 from src.utils.logger import set_ui_callback
 from src.ui import ui_kit
@@ -349,13 +349,48 @@ class MainWindow:
         self.send_progress.set_status("就绪")
         logger.info("启动校准: key=%s account=%s", key, acct)
 
-    def _ensure_calibration(self, key: str) -> bool:
-        """发送/扫描前检查校准（账户感知：账户专属或继承全局都算已校准）"""
-        if calibration_has_key(key, self._current_account_name()):
-            return True
-        if messagebox.askyesno("未校准", f"尚未校准 [{key}] 区域，现在打开校准工具？"):
-            self._launch_calibrate(key)
-        return False
+    def _guide_setup(self, coord_keys: list[str], calib_keys: list[str]) -> bool:
+        """统一引导：坐标未配置先引导坐标，再 OCR 校准。任一取消返回 False。
+
+        就绪检查 → 坐标引导（打开设置→坐标）→ OCR 引导（打开校准工具）。
+        每次校准完需重新触发操作；引导入口统一，弹窗按钮 左[校准] 右[取消]。
+        """
+        state = guidance.check_ready(self._current_account_name(), coord_keys, calib_keys)
+        if state == guidance.READY_NEED_COORDS:
+            if self._ask_calibrate("坐标校准",
+                                   "尚未设置坐标，部分功能无法正确定位。\n是否现在校准坐标？"):
+                self._open_settings("坐标")
+            return False
+        if state == guidance.READY_NEED_CALIB:
+            key = calib_keys[0]
+            label = guidance.CALIB_LABELS.get(key, key)
+            if self._ask_calibrate("OCR 校准", f"尚未校准 {label} 区域，\n是否现在校准？"):
+                self._launch_calibrate(key)
+            return False
+        return True
+
+    def _ask_calibrate(self, title: str, message: str) -> bool:
+        """自定义确认弹窗：左边「校准」右边「取消」。返回 True=点校准"""
+        dlg = tk.Toplevel(self.root)
+        dlg.title(title)
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        result = [False]
+        ttk.Label(dlg, text=message, justify=tk.LEFT).pack(padx=20, pady=(16, 12))
+        btn = ttk.Frame(dlg)
+        btn.pack(pady=(0, 14))
+        ttk.Button(btn, text="校准",
+                   command=lambda: [result.__setitem__(0, True), dlg.destroy()]).pack(side=tk.LEFT)
+        ttk.Button(btn, text="取消", command=dlg.destroy).pack(side=tk.RIGHT)
+        dlg.update_idletasks()
+        # 居中到主窗口
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_rootx(), self.root.winfo_rooty()
+        w, h = dlg.winfo_reqwidth(), dlg.winfo_reqheight()
+        dlg.geometry(f"+{px + (pw - w) // 2}+{py + (ph - h) // 2}")
+        dlg.wait_window()
+        return result[0]
 
     def _on_account_selected(self, _event=None) -> None:
         if self._account_var:
@@ -438,7 +473,7 @@ class MainWindow:
     def _on_search_contacts_clicked(self):
         if not self._ensure_not_busy():
             return
-        if not self._ensure_calibration("contacts_list"):
+        if not self._guide_setup(guidance.SCAN_COORD_KEYS, ["contacts_list"]):
             return
         if not self._on_search_contacts:
             return
@@ -460,7 +495,7 @@ class MainWindow:
     def _on_import_all_clicked(self):
         if not self._ensure_not_busy():
             return
-        if not self._ensure_calibration("contacts_list"):
+        if not self._guide_setup(guidance.SCAN_COORD_KEYS, ["contacts_list"]):
             return
         if not self._on_search_contacts:
             return
@@ -616,16 +651,6 @@ class MainWindow:
             "建议平铺窗口后重新进入多开。\n是否仍然继续？",
         )
 
-    def _check_calibration(self) -> bool:
-        """发送前检查是否做过聊天标题校准，未校准则提示。返回 True=可继续"""
-        if calibration_has_key("chat_title", self._current_account_name()):
-            return True
-        return messagebox.askyesno(
-            "提示",
-            "尚未校准聊天标题 OCR 区域，群发时可能无法正确验证发送对象。\n"
-            "建议先在 [OCR] → [OCR校准] 聊天界面标题 完成校准。\n\n是否仍然继续？",
-        )
-
     def _on_start_send(self):
         if not self._ensure_not_busy():
             return
@@ -644,7 +669,7 @@ class MainWindow:
             return
 
         # 发送前检查 OCR 校准（未校准会干扰发送对象验证）
-        if not self._check_calibration():
+        if not self._guide_setup(guidance.SEND_COORD_KEYS, ["chat_title"]):
             return
 
         attachments = self.message_editor.get_attachments()
