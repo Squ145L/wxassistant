@@ -16,6 +16,7 @@ import uiautomation as uia
 import pyperclip
 from PIL import Image, ImageGrab
 
+from src.utils.calibration import load_calibration
 from src.utils.config import (
     WEIXIN_WINDOW_TITLES,
     CLIPBOARD_DELAY,
@@ -27,23 +28,8 @@ from src.utils.coordinates import get_coord, resolve_calibration_rect
 
 logger = logging.getLogger(__name__)
 
-# OCR 校准配置文件路径（和 calibrate.py 同样的位置格式）
-OCR_CALIBRATION_PATH = Path("cache/ocr_calibration.json")
-
 # OCR 混淆字符映射配置（在 OCR 引擎中也会加载）
 OCR_CONFUSION_PATH = Path("OCR/ocr_confusion.json")
-
-# 聊天标题区域的默认校准参数（窗口内相对坐标）
-#   LEFT_MARGIN: 距左边缘 px
-#   TOP_PCT:     距顶部比例 (0~1)
-#   RIGHT_MARGIN: 距右边缘 px
-#   BOTTOM_MARGIN: 距离底部高度比例, by = wh * (1 - BOTTOM_MARGIN)
-DEFAULT_CHAT_TITLE_CALIB = {
-    "LEFT_MARGIN": 0.05,      # 百分比（兼容旧格式：>1 = 像素）
-    "TOP_PCT": 0.015,
-    "RIGHT_MARGIN": 0.06,     # 百分比（兼容旧格式：>1 = 像素）
-    "BOTTOM_MARGIN": 0.91,    # 标题栏占窗口 ~9% 高度
-}
 
 
 class WeChatNotFoundError(Exception):
@@ -338,30 +324,14 @@ class WeChatBridge:
             result = result.replace(src, dst)
         return result
 
-    def _calibration_path(self) -> Path:
-        """账户专属校准文件（该账户单独校准过），否则全局校准文件"""
-        if self._account_name:
-            from src.utils.account_paths import calibration_path_for
-            return calibration_path_for(self._account_name)
-        return OCR_CALIBRATION_PATH
-
     def _get_chat_title_rect(self) -> Optional[Tuple[int, int, int, int]]:
         """获取聊天标题区域的屏幕坐标（按校准参数从窗口推算）"""
         rect = self.get_window_rect()
         if rect is None:
             return None
 
-        # 加载校准参数（账户专属优先，回退全局）
-        calib = dict(DEFAULT_CHAT_TITLE_CALIB)
-        path = self._calibration_path()
-        if path.exists():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                if "chat_title" in data:
-                    calib.update(data["chat_title"])
-            except Exception:
-                logger.warning("OCR 校准文件读取失败，使用默认值: %s", path)
-
+        # 校准参数：账户专属覆盖全局，再回退默认值
+        calib = load_calibration("chat_title", self._account_name)
         result = resolve_calibration_rect(calib, rect)
         logger.debug("聊天标题区域: (%d,%d)-(%d,%d)", *result)
         return result

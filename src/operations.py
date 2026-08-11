@@ -4,19 +4,17 @@
 不导入 ui/ 层。
 """
 
-import json
 import logging
 import queue
 import re
 import time
-from pathlib import Path
-from typing import Optional
 
 import win32gui
 import win32api
 import win32con
 
 from src.services.send_service import SendResult
+from src.utils.calibration import load_calibration
 from src.utils.coordinates import get_coord, resolve_calibration_rect
 
 logger = logging.getLogger(__name__)
@@ -209,7 +207,7 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
     scroll_px = scan["scroll_px"]
     scroll_times = scan.get("pages_per_scroll", 1)  # 每页滚几次
 
-    calib = _load_calibration("contacts_list", bridge.account_name)
+    calib = load_calibration("contacts_list", bridge.account_name)
     rect = win32gui.GetWindowRect(hwnd)
     left, top, right, bottom = rect
     ww, wh = right - left, bottom - top
@@ -355,21 +353,3 @@ def make_search_contacts_callback(get_bridge, friend_service):
 # ================================================================
 # 工具
 # ================================================================
-
-def _load_calibration(key: str, account_name: Optional[str] = None) -> dict:
-    """从校准文件加载参数（账户专属优先，回退全局）"""
-    # 用 wechat_bridge 的默认值作为 fallback（已是百分比格式）
-    from src.driver.wechat_bridge import DEFAULT_CHAT_TITLE_CALIB
-    calib = dict(DEFAULT_CHAT_TITLE_CALIB)
-    config_path = Path("cache/ocr_calibration.json")
-    if account_name:
-        from src.utils.account_paths import calibration_path_for
-        config_path = calibration_path_for(account_name)
-    if config_path.exists():
-        try:
-            data = json.loads(config_path.read_text(encoding="utf-8"))
-            if key in data:
-                calib = data[key]
-        except Exception:
-            pass
-    return calib

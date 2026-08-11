@@ -10,7 +10,6 @@ except Exception:
     except Exception:
         pass
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -22,34 +21,16 @@ from PIL import ImageGrab, Image, ImageTk
 import tkinter as tk
 from tkinter import messagebox
 
+from src.utils.calibration import DEFAULT_CALIBRATION, load_calibration, save_calibration, reset_calibration
+
 PROJECT_DIR = Path(__file__).resolve().parent
 CACHE_DIR = PROJECT_DIR / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_PATH = CACHE_DIR / "ocr_calibration.json"
 ACCOUNT = None  # --account 参数（多开时按账户保存校准）
 
-
-def _config_path():
-    """账户专属校准文件（指定账户时），否则全局文件"""
-    if ACCOUNT:
-        from src.utils.account_paths import calibration_path_for
-        return calibration_path_for(ACCOUNT)
-    return CONFIG_PATH
-
-DEFAULTS = {
-    "chat_title": {
-        "LEFT_MARGIN": 0.05, "TOP_PCT": 0.015, "RIGHT_MARGIN": 0.06,
-        "BOTTOM_MARGIN": 0.91, "desc": "聊天标题栏",
-    },
-    "search_panel": {
-        "LEFT_MARGIN": 0.03, "TOP_PCT": 0.08, "RIGHT_MARGIN": 0.03,
-        "BOTTOM_MARGIN": 0.30, "desc": "搜索面板",
-    },
-    "contacts_list": {
-        "LEFT_MARGIN": 0.03, "TOP_PCT": 0.25, "RIGHT_MARGIN": 0.26,
-        "BOTTOM_MARGIN": 0.05, "desc": "通讯录列表",
-    },
-}
+_DESC = {"chat_title": "聊天标题栏", "search_panel": "搜索面板", "contacts_list": "通讯录列表"}
+DEFAULTS = {k: {**v, "desc": _DESC.get(k, k)} for k, v in DEFAULT_CALIBRATION.items()}
 
 BAR_H = 60
 
@@ -73,24 +54,12 @@ def find_wechat(key: str = ""):
 
 
 def load_config(key: str) -> dict:
-    defaults = dict(DEFAULTS.get(key, {}))
-    path = _config_path()
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if key in data: defaults.update(data[key])
-        except Exception: pass
-    return defaults
+    """加载校准参数：全局 → 账户（--account）→ 默认"""
+    return load_calibration(key, ACCOUNT)
 
 
 def save_config(key: str, params: dict) -> None:
-    path = _config_path()
-    existing = {}
-    if path.exists():
-        try: existing = json.loads(path.read_text(encoding="utf-8"))
-        except Exception: pass
-    existing[key] = params
-    path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_calibration(key, params, ACCOUNT)
 
 
 def main():
@@ -217,15 +186,7 @@ def main():
 
     def do_reset():
         if messagebox.askyesno("重置", f"确认删除 [{key}] 的校准参数？"):
-            path = _config_path()
-            if path.exists():
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                    if key in data:
-                        del data[key]
-                    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-                except Exception:
-                    pass
+            reset_calibration(key, ACCOUNT)
             messagebox.showinfo("已重置", f"区域 [{key}] 已重置。")
 
     def do_save():

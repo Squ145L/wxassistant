@@ -8,6 +8,7 @@ from tkinter import ttk, messagebox
 from pathlib import Path
 from typing import Callable, Optional
 
+from src.utils.calibration import reset_calibration
 from src.utils.settings_store import (
     DEFAULT_SETTINGS,
     load_scan_settings,
@@ -273,13 +274,7 @@ class SettingsDialog(tk.Toplevel):
     def _reset_ocr(self) -> None:
         if not messagebox.askyesno("OCR 校准重置", "确认清除所有 OCR 校准参数？"):
             return
-        if self._account_name:
-            from src.utils.account_paths import calibration_path_for
-            config_path = calibration_path_for(self._account_name)
-        else:
-            config_path = Path("cache/ocr_calibration.json")
-        if config_path.exists():
-            config_path.write_text("{}", encoding="utf-8")
+        reset_calibration(None, self._account_name)
         messagebox.showinfo("已重置", "OCR 校准参数已清除。")
 
     def _calibrate(self, key: str) -> None:
