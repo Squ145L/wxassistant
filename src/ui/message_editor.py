@@ -5,13 +5,14 @@ from tkinter import ttk, filedialog, messagebox
 from typing import Callable, Optional
 
 from src.utils.config import DEFAULT_SEND_INTERVAL, MAX_ATTACHMENT_COUNT
+from src.ui import ui_kit
 
 
 class MessageEditor(ttk.Frame):
     """右侧面板：消息模板编辑 + 附件管理"""
 
     def __init__(self, parent: tk.Widget):
-        super().__init__(parent, padding=8)
+        super().__init__(parent, padding=ui_kit.PAD_M)
         self._attachments: list[str] = []
         self._on_text_changed: Optional[Callable[[], None]] = None
         self._build_ui()
@@ -19,14 +20,14 @@ class MessageEditor(ttk.Frame):
     def _build_ui(self):
         # === 消息模板标题 ===
         header = ttk.Frame(self)
-        header.pack(fill=tk.X, pady=(0, 4))
+        header.pack(fill=tk.X, pady=(0, ui_kit.PAD_S))
 
         ttk.Label(header, text="📝 消息模板", font=("", 11, "bold")).pack(side=tk.LEFT)
         # 提示文字 expand: 宽度不足时它先被压缩(文字截断)
         ttk.Label(
             header, text="[name]=好友名 [name2]=后两字",
             foreground="gray", font=("", 9), anchor=tk.W,
-        ).pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
+        ).pack(side=tk.LEFT, padx=(ui_kit.PAD_L, 0), fill=tk.X, expand=True)
 
         # === 模板输入框（固定高度，不挤占底部空间）===
         template_frame = ttk.Frame(self)
@@ -62,11 +63,11 @@ class MessageEditor(ttk.Frame):
             foreground="gray",
             font=("", 8),
         )
-        self._var_hint.pack(anchor=tk.W, pady=(2, 6))
+        self._var_hint.pack(anchor=tk.W, pady=(ui_kit.PAD_XS, ui_kit.PAD_M))
 
         # === 附件区 ===
-        attach_frame = ttk.LabelFrame(self, text="📎 附件", padding=6)
-        attach_frame.pack(fill=tk.X, pady=(0, 8))
+        attach_frame = ttk.LabelFrame(self, text="📎 附件", padding=ui_kit.PAD_M)
+        attach_frame.pack(fill=tk.X, pady=(0, ui_kit.PAD_M))
 
         btn_row = ttk.Frame(attach_frame)
         btn_row.pack(fill=tk.X)
@@ -81,7 +82,7 @@ class MessageEditor(ttk.Frame):
             btn_row, text="➖ 移除选中",
             command=self._remove_attachment,
         )
-        self._btn_remove.pack(side=tk.LEFT, padx=(4, 0))
+        self._btn_remove.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
 
         # 附件列表
         self._attach_listbox = tk.Listbox(
@@ -90,14 +91,14 @@ class MessageEditor(ttk.Frame):
             font=("", 9),
             relief=tk.FLAT,
         )
-        self._attach_listbox.pack(fill=tk.X, pady=(4, 0))
+        self._attach_listbox.pack(fill=tk.X, pady=(ui_kit.PAD_S, 0))
 
         # === 选中计数 ===
         self._selected_var = tk.StringVar(value="已选 0 人")
         ttk.Label(
             self, textvariable=self._selected_var,
             foreground="gray", font=("", 9),
-        ).pack(anchor=tk.E, pady=(4, 0))
+        ).pack(anchor=tk.E, pady=(ui_kit.PAD_S, 0))
 
     # ================================================================
     # 公开接口
