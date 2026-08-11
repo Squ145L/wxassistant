@@ -46,14 +46,15 @@ COLOR_MUTED = "#888888"     # 弱化文字（灰）
 COLOR_BLOCK = "#eef1f5"     # 浅色背景块（块分区：用背景区分区域，不用分割线）
 
 
-def configure_style(root: Optional[tk.Tk] = None) -> None:
-    """一次性配置全局 ttk 样式：clam 主题 + 命名按钮/标签样式。
+def configure_style(root: Optional[tk.Tk] = None, theme: str = "clam") -> None:
+    """配置全局 ttk 样式：指定主题 + 命名按钮/标签样式。
 
-    入口调用一次即可。按钮工厂的 variant 参数会映射到这里的命名样式，
-    保证全应用同款配色。想换整体风格，改上面的 COLOR_* 常量。
+    入口调用一次即可（main_window 传用户设置的 theme）。按钮工厂的 variant
+    参数会映射到这里的命名样式。切主题时重调本函数（theme_use 后需重新
+    configure 命名样式，否则新主题下 variant 会退化为默认按钮）。
     """
     style = ttk.Style(root)
-    style.theme_use("clam")
+    style.theme_use(theme)
     style.configure("Primary.TButton", foreground="white", background=COLOR_PRIMARY)
     style.configure("Success.TButton", foreground="white", background=COLOR_SUCCESS)
     style.configure("Danger.TButton", foreground="white", background=COLOR_DANGER)

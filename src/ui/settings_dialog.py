@@ -56,6 +56,7 @@ class SettingsDialog(tk.Toplevel):
         # name_source 是账户级设置（每个账户独立）；None 账户名 → 默认账户
         account_settings = load_account_settings(self._account_name or "")
         self._name_source = tk.StringVar(value=account_settings.get("name_source", "cache"))
+        self._theme_var = tk.StringVar(value=self._settings.get("theme", "clam"))
         self._ocr_debug = tk.BooleanVar(value=self._settings.get("ocr_debug_save", False))
         self._logging_enabled = tk.BooleanVar(value=self._settings.get("logging_enabled", True))
         self._page_count = tk.IntVar(value=self._settings.get("scan_page_count", 10))
@@ -97,6 +98,18 @@ class SettingsDialog(tk.Toplevel):
         ttk.Label(tab1, text="发送的 name 来源:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
         ttk.Radiobutton(tab1, text="缓存加载", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(tab1, text="OCR 扫描  (扫描微信通讯录获取)", variable=self._name_source, value="ocr").pack(anchor=tk.W, pady=2)
+
+        ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+
+        ttk.Label(tab1, text="界面主题:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        theme_row = ttk.Frame(tab1)
+        theme_row.pack(fill=tk.X)
+        from src.ui import ui_kit
+        theme_combo = ui_kit.make_combo(theme_row, ["clam", "alt", "vista", "xpnative"], width=10)
+        theme_combo.configure(textvariable=self._theme_var)
+        theme_combo.bind("<<ComboboxSelected>>", self._on_theme_selected)
+        theme_combo.pack(side=tk.LEFT)
+        ttk.Label(theme_row, text="（即时切换整界面配色）", foreground="gray").pack(side=tk.LEFT, padx=ui_kit.PAD_S)
 
         ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
 
@@ -191,6 +204,7 @@ class SettingsDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="关闭", command=self._on_close).pack(side=tk.RIGHT)
 
     def _on_close(self) -> None:
+        self._settings["theme"] = self._theme_var.get()
         self._settings["ocr_debug_save"] = self._ocr_debug.get()
         self._settings["logging_enabled"] = self._logging_enabled.get()
         self._settings["scan_page_count"] = self._page_count.get()
@@ -208,6 +222,11 @@ class SettingsDialog(tk.Toplevel):
                               {"name_source": self._name_source.get()})
         self._save_coordinates()
         self.destroy()
+
+    def _on_theme_selected(self, _event=None) -> None:
+        """即时切换 ttk 主题（theme_use 后重配命名样式）"""
+        from src.ui import ui_kit
+        ui_kit.configure_style(self._parent, self._theme_var.get())
 
     def _on_account_selected(self, _event=None) -> None:
         """设置弹窗内切换账户：保存当前账户 → 重开对应账户的设置"""
