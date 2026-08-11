@@ -90,3 +90,32 @@ def test_find_overlapping_accounts():
 def test_find_overlapping_accounts_empty_when_no_overlap():
     rects = [("A", (0, 0, 100, 100)), ("B", (200, 200, 300, 300))]
     assert find_overlapping_accounts(rects) == []
+
+
+def test_add_rejects_sanitized_duplicate():
+    # "A:B" 与 "A/B" 都折叠为 "A_B"，会共用同一数据文件，必须拒绝
+    s = MultiAccountSession()
+    assert s.add("A:B", 0x1)
+    assert not s.add("A/B", 0x2)
+    assert s.count == 1
+
+
+def test_add_rejects_duplicate_hwnd():
+    s = MultiAccountSession()
+    assert s.add("账户1", 0x10000)
+    assert not s.add("账户2", 0x10000)   # 同一窗口不能绑两次
+    assert s.count == 1
+
+
+def test_rename_rejects_sanitized_duplicate():
+    s = MultiAccountSession()
+    s.add("A:B", 0x1)
+    s.add("账户2", 0x2)
+    assert not s.rename(1, "A/B")
+    assert s.accounts[1].name == "账户2"
+
+
+def test_rename_out_of_range_returns_false():
+    s = MultiAccountSession()
+    s.add("账户1", 0x1)
+    assert not s.rename(5, "新名")       # 不应抛 IndexError
