@@ -27,7 +27,8 @@ class TopBar(ttk.Frame):
         self._on_settings: Optional[Callable[[], None]] = None
         self._on_help: Optional[Callable[[], None]] = None
         self._on_multiopen: Optional[Callable[[], None]] = None
-        self._multi = False  # 多账户模式：账户下拉可切换
+        self._on_account_manager: Optional[Callable[[], None]] = None
+        self._multi = False  # 有账户列表时：账户下拉可切换
         self._build_ui()
 
     # ================================================================
@@ -91,9 +92,9 @@ class TopBar(ttk.Frame):
         # 左侧：联系人 / 标签菜单
         self._btn_tags.pack(side=tk.LEFT, padx=(8, 0))
         self._btn_contacts.pack(side=tk.LEFT, padx=(8, 0))
-        # 账户（默认隐藏，单账户模式不显示）
-        self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
+        # 账户（始终显示：账户: [combo]，单/多模式都有账户可切）
         self._account_label.pack(side=tk.LEFT)
+        self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
         self.set_account_options(None)
 
     # ================================================================
@@ -101,16 +102,15 @@ class TopBar(ttk.Frame):
     # ================================================================
 
     def set_account_options(self, names, account_var=None, on_change=None) -> None:
-        """多账户：显示账户下拉；单账户：隐藏
+        """显示账户下拉（单/多模式都可用）。names 空/None → 禁用（暂无账户）。
 
-        names: 账户名列表（空/None = 单账户，隐藏）
+        names: 账户名列表
         account_var: tk.StringVar（由外部持有，MainWindow 读取当前账户）
         on_change: 切换账户回调 (name) -> None
         """
         self._multi = bool(names)
         if names:
-            self._account_label.pack(side=tk.LEFT)
-            self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
+            self._account_combo.config(state="readonly")
             self._account_combo["values"] = list(names)
             if account_var is not None:
                 self._account_combo.configure(textvariable=account_var)
@@ -120,12 +120,8 @@ class TopBar(ttk.Frame):
                 self._on_account_change = on_change
                 self._account_combo.bind("<<ComboboxSelected>>", self._on_combo_selected)
         else:
-            # 单账户：显示"全局"（禁用），账户维度始终可见
-            self._account_label.pack(side=tk.LEFT)
-            self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
-            self._account_combo["values"] = ["全局"]
-            self._account_combo.set("全局")
             self._account_combo.config(state="disabled")
+            self._account_combo["values"] = []
 
     def _on_combo_selected(self, _event=None) -> None:
         if self._on_account_change:
@@ -167,3 +163,4 @@ class TopBar(ttk.Frame):
     def set_on_settings(self, cb): self._on_settings = cb
     def set_on_help(self, cb): self._on_help = cb
     def set_on_multiopen(self, cb): self._on_multiopen = cb
+    def set_on_account_manager(self, cb): self._on_account_manager = cb

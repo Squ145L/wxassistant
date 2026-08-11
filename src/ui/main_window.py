@@ -45,6 +45,7 @@ class MainWindow:
         self._on_search_contacts: Optional[Callable] = None
         self._on_enter_multiopen: Optional[Callable] = None
         self._on_exit_multiopen: Optional[Callable] = None
+        self._on_account_manager: Optional[Callable] = None
         self._progress_queue: queue.Queue = queue.Queue()
         self._stop_event: Optional[threading.Event] = None
         self._interrupt_poll_active: bool = False
@@ -91,11 +92,16 @@ class MainWindow:
     def set_exit_multiopen_callback(self, callback: Callable) -> None:
         self._on_exit_multiopen = callback
 
+    def set_on_account_manager(self, callback: Callable) -> None:
+        self._on_account_manager = callback
+
     def set_account_runtime(self, runtime: dict) -> None:
-        """注入多账户运行时：{账户名: (bridge, friend_service)}"""
+        """注入账户运行时：{账户名: (bridge, friend_service)}（单/多模式通用）"""
         self._account_runtime = runtime
-        if self._multi_session and runtime:
-            first = self._multi_session.names[0]
+        names = list(runtime.keys())
+        if names:
+            self.top_bar.set_account_options(names, self._account_var, self._on_account_selected)
+            first = names[0]
             self._account_var.set(first)
             self._switch_account(first)
 
@@ -146,10 +152,10 @@ class MainWindow:
         self.top_bar.set_on_help(self._on_help_clicked)
         self.top_bar.set_on_multiopen(self._on_multiopen_clicked)
 
+        # 账户选择器始终创建；账户列表由 set_account_runtime 填充
+        self._account_var = tk.StringVar()
+        self.top_bar.set_account_options([], self._account_var, self._on_account_selected)
         if self._multi_session is not None:
-            self._account_var = tk.StringVar()
-            self.top_bar.set_account_options(
-                self._multi_session.names, self._account_var, self._on_account_selected)
             self.top_bar.set_multiopen_label(True)
 
         # 底部先 pack（确保不被挤出）
@@ -363,6 +369,13 @@ class MainWindow:
             if self._on_enter_multiopen:
                 self._on_enter_multiopen()
 
+    def _on_account_manager_clicked(self) -> None:
+        """打开账户管理弹窗：新建/重命名/删除/双击切换"""
+        from src.ui.account_manager_dialog import AccountManagerDialog
+        dlg = AccountManagerDialog(self.root, current=self._current_account_name() or "",
+                                   on_switch=self._switch_account)
+        dlg.grab_set()
+
     def _on_refresh(self) -> None:
         """刷新按钮：清除所有红色标记 + 重新连接微信窗口"""
         self.friend_list.clear_failed_marks()
@@ -534,16 +547,14 @@ class MainWindow:
         messagebox.showinfo("导出完成", f"已导出 {len(selected)} 位联系人到：\n{path}")
 
     def _current_account_name(self) -> Optional[str]:
-        """当前账户名（多账户）；单账户返回 None"""
-        if self._multi_session is not None and self._account_var:
+        """当前账户名（单/多模式都用账户选择器的选中值）；无账户时返回 None"""
+        if self._account_var and self._account_var.get():
             return self._account_var.get()
         return None
 
     def _current_account_names(self) -> list[str]:
-        """多账户模式下的全部账户名；单账户返回空列表"""
-        if self._multi_session is not None:
-            return self._multi_session.names
-        return []
+        """当前可切换的账户名列表（单/多模式）；无账户返回空列表"""
+        return list(self._account_runtime.keys())
 
     def _open_settings(self, tab: str = "常规") -> None:
         """打开设置弹窗（携带当前账户上下文 + 校准入口）"""

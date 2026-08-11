@@ -142,25 +142,31 @@ def _build_window(multi_session=None):
     send_service = SendService()
 
     if multi_session is None:
-        # ---- 单账户模式（原逻辑）----
-        bridge = WeChatBridge()
-        bridge.find_window()
-        friend_service = FriendService()
-        friend_service.load_cache()
+        # ---- 单账户模式：账户持久化，选择器切换 ----
+        from src.services.account_registry import load_accounts
 
         window = MainWindow()
-        window.set_bridge(bridge)
+        bridge = WeChatBridge()
+        bridge.find_window()
         bridge.set_hook_control(
             window.suspend_interrupt_hook,
             window.resume_interrupt_hook,
         )
-        window.set_friend_service(friend_service)
+        window.set_bridge(bridge)
+
+        runtime: dict[str, tuple] = {}
+        for name in load_accounts():
+            fs = FriendService.for_account(name)
+            fs.load_cache()
+            runtime[name] = (bridge, fs)
+        window.set_account_runtime(runtime)
+
         window.set_send_callback(
-            make_send_callback(lambda: bridge, template_engine, send_service))
+            make_send_callback(window.get_current_bridge, template_engine, send_service))
         window.set_check_names_callback(
-            make_check_names_callback(lambda: bridge, friend_service))
+            make_check_names_callback(window.get_current_bridge, window.get_current_friend_service))
         window.set_search_contacts_callback(
-            make_search_contacts_callback(lambda: bridge, friend_service))
+            make_search_contacts_callback(window.get_current_bridge, window.get_current_friend_service))
         window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))
         return window
 
