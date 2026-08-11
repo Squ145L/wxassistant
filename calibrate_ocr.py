@@ -34,6 +34,34 @@ DEFAULTS = {k: {**v, "desc": _DESC.get(k, k)} for k, v in DEFAULT_CALIBRATION.it
 
 BAR_H = 60
 
+# OCR 区域 → 参考图文件名（截图放入 帮助/pngs/ 后自动显示，同坐标校准的缩略图引导）
+HELP_DIR = PROJECT_DIR / "帮助" / "pngs"
+OCR_HELP_IMAGES = {
+    "chat_title": "ocr_聊天标题.png",
+    "contacts_list": "ocr_通讯录区域.png",
+    "search_panel": "ocr_搜索面板.png",
+}
+
+
+def _show_help_thumbnail(root: tk.Tk, key: str, desc: str):
+    """显示 OCR 校准参考缩略图（与坐标校准 ThumbnailWindow 同款）。图缺失时返回 None。"""
+    img_path = HELP_DIR / OCR_HELP_IMAGES.get(key, "")
+    if not img_path.exists():
+        return None
+    try:
+        thumb = tk.Toplevel(root)
+        thumb.title(f"参考 - {desc}")
+        thumb.resizable(False, False)
+        thumb.attributes("-topmost", True)
+        img = Image.open(img_path)
+        img.thumbnail((320, 240), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        tk.Label(thumb, image=photo).pack(padx=8, pady=8)
+        thumb._photo = photo  # 防 GC
+        return thumb
+    except Exception:
+        return None
+
 
 def find_wechat(key: str = ""):
     # 指定了锁定窗口且有效 → 直接用它（chat_title 等主窗口类）
@@ -206,6 +234,13 @@ def main():
         }
         save_config(key, params)
         messagebox.showinfo("已保存", f"区域 [{key}] 已保存!\n{desc}")
+        # 保存后自动关闭：通讯录管理窗口（contacts_list 校准用）+ 校准窗口
+        if key == "contacts_list":
+            try:
+                win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+            except Exception:
+                pass
+        root.destroy()
 
     # ---- 拖拽 ----
     drag = {"corner": None, "sx": 0, "sy": 0}
@@ -305,6 +340,7 @@ def main():
         root.focus_force()
         rebuild_display()
         root.after(800, lambda: root.attributes("-topmost", False))
+    _show_help_thumbnail(root, key, desc)   # 参考缩略图（图在 帮助/pngs/ 时显示）
     root.after(100, _raise_window)
     root.mainloop()
 
