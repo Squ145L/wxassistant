@@ -285,3 +285,30 @@ foreground_lock = threading.Lock()
 - app 顶层模式循环消除嵌套 mainloop
 - 账户切换清空筛选
 - save_cache 同步落盘（共享锁）
+
+### 账户系统重构批次（2026-08-11）
+
+分支 `feature/multi-account-phase1`，`docs/superpowers/plans/2026-08-11-account-system-refactor.md` 交付。账户提升为**持久化第一等概念**，存储格式重构：
+
+**存储结构**
+```
+cache/
+  accounts.json              # 账户名列表 ["默认账户", ...]
+  settings.json              # 全局设置（调试/扫描/多开延迟，不分账户）
+  <账户名>/                  # 每账户一个文件夹（文件夹名=账户名，不与设置混存）
+    friends.json
+    settings.json            # 账户级设置（name_source）
+    ocr_calibration.json     # 该账户 OCR 位置
+    coordinates.json         # 该账户坐标
+```
+旧 `cache/friends.json` 等全局文件废弃，不迁移。
+
+**决策**：账户列表持久化、多开窗口绑定仍会话级；多开引导把窗口绑到**已有持久账户**（或新建）；坐标/OCR 校准每账户独立、未设置回退代码默认值（不继承默认账户）。
+
+**新文件**：`src/services/account_registry.py`（账户列表持久化 + 重命名移文件夹/删除）、`src/ui/account_manager_dialog.py`（账户管理弹窗：新建/重命名/删除/双击切换）。
+
+**改动**：`account_paths.py` 文件夹化；`friend_service`/`coordinates`/`calibration`/`settings_store` 改读账户文件夹；单模式也构建账户运行时（顶部 `账户:[...]` 选择器常显可切换）；设置对话框账户行常显、name_source 账户级；多开引导绑持久账户。
+
+**UI**：删除按钮宽度对齐反选；`[标签]/[联系人]` toggle 菜单（再点/点旁边收起）；筛选栏 `标签:[全部]` 顺序；设置→OCR 可滚动 + 校准按钮置顶；[关闭] 按钮贴底可见。
+
+**清理**：搜一搜独立窗口功能（设置/坐标/wechat_bridge/coord_picker 全部触点）删除。
