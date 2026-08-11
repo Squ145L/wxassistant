@@ -84,13 +84,13 @@ class TopBar(ttk.Frame):
         self._btn_account_mgr = ttk.Button(self, text="账户管理", width=8,
                                            command=self._make_cmd("_on_account_manager"))
 
-        # 布局：左侧分组菜单 → 账户 → 多开/账户管理 → 弹性区 → 右侧 帮助/设置/刷新
+        # 布局：账户 → 账户管理 → 多开 → 联系人▾ → 弹性区 → 右侧 帮助/设置/刷新
         # （弹性区吸收多余空间，固定控件永不互相挤压折叠 —— 布局铁律 1）
-        self._btn_contacts.pack(side=tk.LEFT)
-        self._account_label.pack(side=tk.LEFT, padx=(ui_kit.PAD_M, 0))
+        self._account_label.pack(side=tk.LEFT)
         self._account_combo.pack(side=tk.LEFT, padx=(0, ui_kit.PAD_S))
-        self._btn_multiopen.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         self._btn_account_mgr.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        self._btn_multiopen.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        self._btn_contacts.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         ui_kit.Spacer(self).pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._btn_help.pack(side=tk.RIGHT)
         self._btn_settings.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
