@@ -312,3 +312,16 @@ cache/
 **UI**：删除按钮宽度对齐反选；`[标签]/[联系人]` toggle 菜单（再点/点旁边收起）；筛选栏 `标签:[全部]` 顺序；设置→OCR 可滚动 + 校准按钮置顶；[关闭] 按钮贴底可见。
 
 **清理**：搜一搜独立窗口功能（设置/坐标/wechat_bridge/coord_picker 全部触点）删除。
+
+### UI 布局重构批次（2026-08-11）
+
+分支 `feature/multi-account-phase1`，`docs/superpowers/plans/2026-08-11-ui-layout-refactor.md` 交付（规范依据 `.omc/CODING_STANDARDS.md` §6 半集中 + 弹性布局）：
+
+- 新增 `src/ui/ui_kit.py`（集中绘制层：间距/配色/控件工厂/Spacer/窗口默认，纯标准库）
+- 主窗口：浅色背景块分区（`make_block`），`tk.PanedWindow` 无 sashrelief；左 pane minsize 380 / 右 260；窗口 minsize 880×560
+- 顶栏变轻：联系人▾ 标签▾ 账户:▾ 多开 账户管理（弹性区 Spacer）刷新 设置 帮助；`[标签][联系人]` 菜单 toggle（再点/点旁边收起）
+- 搜索/筛选/全选下沉：filter_bar 并入 friend_list（搜索框固定 width=16≈8 汉字），底部操作行 ➕/删除/共N人/全选/反选；删除 filter_bar.py
+- send_progress / message_editor 间距走 ui_kit 常量
+- 主题切换：设置页下拉（clam/alt/vista/xpnative），持久化到 settings.json，启动应用
+
+**参考 demo**：`debugtool/ui_demo/`（`ui_kit.py` + `demo.py`，可交互验证布局，与主程序解耦）。
