@@ -81,15 +81,48 @@ def cmd_test_ocr() -> int:
 
 
 def run_gui() -> None:
-    """启动 GUI（单账户模式）"""
-    window = _build_window(multi_session=None)
-    window.run()
+    """启动 GUI（单账户模式入口）"""
+    run_app(multi_session=None)
 
 
 def run_multi_gui(session) -> None:
-    """启动 GUI（多账户模式）"""
-    window = _build_window(multi_session=session)
-    window.run()
+    """启动 GUI（多账户模式入口）"""
+    run_app(multi_session=session)
+
+
+def run_app(multi_session=None) -> None:
+    """顶层模式循环：单账户 / 多开引导 / 多账户 之间切换
+
+    每个 mainloop 都在顶层运行：窗口销毁后 run() 返回切换请求，
+    由本循环启动下一个窗口/引导，避免 多开↔单用户 往返时嵌套 mainloop。
+    """
+    session = multi_session
+    while True:
+        window = _build_window(multi_session=session)
+        request = window.run()
+        if request == "multiopen":
+            from src.driver.wechat_bridge import WeChatBridge
+            from src.ui.multi_account_dialog import run_multiopen_wizard
+            session = run_multiopen_wizard(WeChatBridge())
+            continue  # session=None → 取消，保持单账户
+        if request == "single":
+            session = None
+            continue
+        break  # 正常退出
+
+
+def _request_mode(window, mode: str) -> None:
+    """设置模式切换请求并销毁当前窗口（顶层 run_app 循环接管）"""
+    window._mode_request = mode
+    window.root.destroy()
+
+
+def _enter_multiopen(window) -> None:
+    _request_mode(window, "multiopen")
+
+
+def _exit_multiopen(window) -> None:
+    _request_mode(window, "single")
 
 
 def _build_window(multi_session=None):
@@ -160,22 +193,3 @@ def _build_window(multi_session=None):
     window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))
     window.set_exit_multiopen_callback(lambda w=window: _exit_multiopen(w))
     return window
-
-
-def _enter_multiopen(window) -> None:
-    """点 [多开]：关闭主窗口 → 打开引导 → 按结果重启对应模式"""
-    from src.driver.wechat_bridge import WeChatBridge
-    from src.ui.multi_account_dialog import run_multiopen_wizard
-
-    window.root.destroy()
-    session = run_multiopen_wizard(WeChatBridge())
-    if session is None:
-        run_gui()  # 取消 → 回单账户模式
-    else:
-        run_multi_gui(session)
-
-
-def _exit_multiopen(window) -> None:
-    """点 [单用户模式]：退出多开，回到单账户模式"""
-    window.root.destroy()
-    run_gui()

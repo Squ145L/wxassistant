@@ -933,4 +933,6 @@ class MainWindow:
             pass
 
     def run(self):
+        """运行主窗口 mainloop；窗口被销毁后返回切换请求（None=退出）"""
         self.root.mainloop()
+        return getattr(self, "_mode_request", None)
