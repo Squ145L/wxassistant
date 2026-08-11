@@ -1,16 +1,16 @@
-"""OCR 校准参数读写 — 全局 + 账户覆盖两级回退（与 coordinates.load_coordinates 同款语义）"""
+"""OCR 校准参数读写 — 账户文件覆盖 → 代码默认值兜底
+
+account_name 为空时视为默认账户（单模式无显式账户名时）。
+"""
 
 import json
 import logging
 from pathlib import Path
 from typing import Optional
 
-from src.utils.account_paths import calibration_path_for
+from src.utils.account_paths import DEFAULT_ACCOUNT_NAME, calibration_path_for
 
 logger = logging.getLogger(__name__)
-
-# 全局校准文件路径（相对项目根，与全项目 Path("cache/...") 风格一致）
-OCR_CALIBRATION_PATH = Path("cache/ocr_calibration.json")
 
 # 各区域默认校准参数（窗口内百分比；LEFT/RIGHT_MARGIN >1 = 旧格式像素，兼容）
 DEFAULT_CALIBRATION: dict[str, dict[str, float]] = {
@@ -26,11 +26,8 @@ DEFAULT_CALIBRATION: dict[str, dict[str, float]] = {
 }
 
 
-def _calibration_path(account_name: Optional[str] = None) -> Path:
-    """账户专属校准文件路径；account_name 为空用全局文件"""
-    if account_name:
-        return calibration_path_for(account_name)
-    return OCR_CALIBRATION_PATH
+def _calibration_path(account_name: Optional[str]) -> Path:
+    return calibration_path_for(account_name or DEFAULT_ACCOUNT_NAME)
 
 
 def _apply_key(merged: dict, path: Path, key: str) -> None:
@@ -47,29 +44,23 @@ def _apply_key(merged: dict, path: Path, key: str) -> None:
 
 
 def load_calibration(key: str, account_name: Optional[str] = None) -> dict:
-    """加载某区域校准参数：全局文件 → 账户专属文件覆盖 → 默认值兜底"""
+    """加载某区域校准参数：账户文件覆盖 → 代码默认值兜底"""
     merged = dict(DEFAULT_CALIBRATION.get(key, {}))
-    _apply_key(merged, OCR_CALIBRATION_PATH, key)                     # 全局
-    if account_name:
-        _apply_key(merged, calibration_path_for(account_name), key)   # 账户覆盖
+    _apply_key(merged, _calibration_path(account_name), key)
     return merged
 
 
 def calibration_has_key(key: str, account_name: Optional[str] = None) -> bool:
-    """该账户（或继承的全局）是否已校准过指定区域"""
-    paths = [OCR_CALIBRATION_PATH]
-    if account_name:
-        paths.append(calibration_path_for(account_name))
-    for path in paths:
-        if not path.exists():
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data.get(key), dict):
-                return True
-        except Exception:
-            logger.warning("OCR 校准文件读取失败: %s", path, exc_info=True)
-    return False
+    """该账户是否已校准过指定区域"""
+    path = _calibration_path(account_name)
+    if not path.exists():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return isinstance(data.get(key), dict)
+    except Exception:
+        logger.warning("OCR 校准文件读取失败: %s", path, exc_info=True)
+        return False
 
 
 def save_calibration(key: str, params: dict, account_name: Optional[str] = None) -> None:

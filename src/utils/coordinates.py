@@ -1,6 +1,7 @@
 """坐标注册中心 — 所有点击坐标的唯一定义点
 
-从 cache/coordinates.json 加载用户自定义坐标，fallback 到默认值。
+从 账户文件夹 cache/<账户>/coordinates.json 加载用户自定义坐标，fallback 到默认值。
+account_name 为空时视为默认账户（单模式无显式账户名的情况）。
 """
 
 import json
@@ -8,9 +9,9 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple
 
-logger = logging.getLogger(__name__)
+from src.utils.account_paths import DEFAULT_ACCOUNT_NAME, coordinates_path_for
 
-COORDINATES_PATH = Path("cache/coordinates.json")
+logger = logging.getLogger(__name__)
 
 # ================================================================
 # 默认坐标（窗口内百分比，相对于窗口左上角）
@@ -56,12 +57,13 @@ COORD_GROUPS = [
 ]
 
 
-def _coordinates_path(account_name: Optional[str] = None) -> Path:
-    """账户专属坐标文件；account_name 为空则用全局文件"""
-    if account_name:
-        from src.utils.account_paths import coordinates_path_for
-        return coordinates_path_for(account_name)
-    return COORDINATES_PATH
+def _resolve_account(account_name: Optional[str]) -> str:
+    """account_name 为空 → 默认账户（单模式无显式账户名时）"""
+    return account_name or DEFAULT_ACCOUNT_NAME
+
+
+def _coordinates_path(account_name: Optional[str]) -> Path:
+    return coordinates_path_for(_resolve_account(account_name))
 
 
 def _apply_coord_file(merged: dict, path: Path) -> None:
@@ -78,17 +80,15 @@ def _apply_coord_file(merged: dict, path: Path) -> None:
 
 
 def load_coordinates(account_name: Optional[str] = None) -> dict[str, Tuple[float, float]]:
-    """加载坐标配置：全局文件 → 账户专属文件覆盖 → 默认值兜底"""
+    """加载坐标配置：账户文件覆盖 → 代码默认值兜底"""
     merged = dict(DEFAULT_COORDINATES)
-    _apply_coord_file(merged, COORDINATES_PATH)                       # 全局
-    if account_name:
-        _apply_coord_file(merged, _coordinates_path(account_name))     # 账户覆盖
+    _apply_coord_file(merged, _coordinates_path(account_name))
     return merged
 
 
 def save_coordinates(coords: dict[str, Tuple[float, float]],
                      account_name: Optional[str] = None) -> None:
-    """保存坐标配置到文件（账户专属或全局）"""
+    """保存坐标配置到账户文件"""
     path = _coordinates_path(account_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     serializable = {k: [v[0], v[1]] for k, v in coords.items()}
@@ -100,7 +100,7 @@ def save_coordinates(coords: dict[str, Tuple[float, float]],
 
 
 def get_coord(key: str, account_name: Optional[str] = None) -> Tuple[float, float]:
-    """获取单个坐标（账户优先，fallback 全局/默认值）
+    """获取单个坐标（账户文件，fallback 默认值）
 
     Returns: (x_pct, y_pct) 窗口内百分比
     """
@@ -111,14 +111,14 @@ def get_coord(key: str, account_name: Optional[str] = None) -> Tuple[float, floa
     return DEFAULT_COORDINATES.get("safe_zone", (0.30, 0.60))
 
 
-def reset_coordinates() -> None:
-    """重置为默认坐标"""
-    save_coordinates(DEFAULT_COORDINATES)
+def reset_coordinates(account_name: Optional[str] = None) -> None:
+    """把指定账户坐标重置为默认值"""
+    save_coordinates(DEFAULT_COORDINATES, account_name)
     logger.info("坐标配置已重置为默认值")
 
 
 def account_has_override(account_name: Optional[str] = None) -> bool:
-    """是否存在账户专属坐标文件（None = 全局文件是否已存在）"""
+    """该账户是否已保存过坐标文件"""
     return _coordinates_path(account_name).exists()
 
 

@@ -19,9 +19,6 @@ FILE_SEND_DELAY = 0.1             # 文件发送后等待
 OCR_CONFIDENCE_THRESHOLD = 0.7    # 低于此值视为不可靠
 OCR_CACHE_TTL = 30                # 同搜索词缓存秒数
 
-# ========== 缓存 ==========
-FRIENDS_CACHE_PATH = "cache/friends.json"
-
 # ========== 日志 ==========
 LOG_DIR = "logs"
 LOG_FILE = "logs/app.log"

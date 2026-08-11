@@ -9,8 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from src.utils.config import FRIENDS_CACHE_PATH
-
 logger = logging.getLogger(__name__)
 
 
@@ -33,13 +31,13 @@ class FriendService:
     - 前缀 / 正则筛选
     """
 
-    def __init__(self, cache_path: str = FRIENDS_CACHE_PATH):
+    def __init__(self, cache_path: str = "cache/friends.json"):
         self._cache_path = Path(cache_path)
         self._friends: list[FriendDTO] = []
 
     @classmethod
     def for_account(cls, account_name: str) -> "FriendService":
-        """创建绑定到指定账户好友文件的实例（多开模式用）"""
+        """创建绑定到指定账户数据文件夹的实例（单/多模式通用）"""
         from src.utils.account_paths import friends_path_for
         return cls(cache_path=str(friends_path_for(account_name)))
 

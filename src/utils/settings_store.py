@@ -1,15 +1,21 @@
-"""设置持久化（纯层，无 UI/驱动依赖）：读写 cache/settings.json
+"""设置持久化（纯层，无 UI/驱动依赖）
 
-从 settings_dialog 抽取，供 driver/operations/main 等各层复用，
-避免 driver/services 反向依赖 ui 层。
+全局设置 cache/settings.json：调试/扫描/多开等不分账户的选项。
+账户级设置 cache/<账户>/settings.json：该账户专属选项（name_source 等）。
+从 settings_dialog 抽取，供 driver/operations/main 等各层复用。
 """
 import json
+import logging
 from pathlib import Path
+
+from src.utils.account_paths import account_settings_path_for
+
+logger = logging.getLogger(__name__)
 
 SETTINGS_PATH = Path("cache/settings.json")
 
+# 全局设置（不分账户）
 DEFAULT_SETTINGS = {
-    "name_source": "cache",
     "ocr_debug_save": False,
     "sousou_independent_enabled": False,
     "scan_page_count": 100,
@@ -23,6 +29,11 @@ DEFAULT_SETTINGS = {
     "multi_open_account_interval": 3.0,     # 两个账户最后一步之间 (s)
     "multi_open_send_interval": 0.1,        # 发送基础间隔 (s)
     "multi_open_popup_retry": 0,            # 弹窗检测重试次数
+}
+
+# 账户级设置（每个账户独立，存在 账户文件夹/settings.json）
+ACCOUNT_DEFAULT_SETTINGS = {
+    "name_source": "cache",   # 该账户联系人来源：cache / ocr
 }
 
 
@@ -49,6 +60,30 @@ def load_scan_settings() -> dict:
 def save_settings(settings: dict) -> None:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_PATH.write_text(
+        json.dumps(settings, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def load_account_settings(account_name: str) -> dict:
+    """加载账户级设置（cache/<账户>/settings.json）；缺失/损坏回退默认"""
+    path = account_settings_path_for(account_name)
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            merged = dict(ACCOUNT_DEFAULT_SETTINGS)
+            merged.update(data)
+            return merged
+        except Exception:
+            logger.warning("账户设置读取失败，回退默认: %s", path, exc_info=True)
+    return dict(ACCOUNT_DEFAULT_SETTINGS)
+
+
+def save_account_settings(account_name: str, settings: dict) -> None:
+    """保存账户级设置"""
+    path = account_settings_path_for(account_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(settings, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
