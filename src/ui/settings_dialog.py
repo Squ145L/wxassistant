@@ -56,7 +56,7 @@ class SettingsDialog(tk.Toplevel):
         # name_source 是账户级设置（每个账户独立）；None 账户名 → 默认账户
         account_settings = load_account_settings(self._account_name or "")
         self._name_source = tk.StringVar(value=account_settings.get("name_source", "cache"))
-        self._theme_var = tk.StringVar(value=self._settings.get("theme", "clam"))
+        self._theme_var = tk.StringVar(value=self._settings.get("theme", "vista"))
         self._ocr_debug = tk.BooleanVar(value=self._settings.get("ocr_debug_save", False))
         self._logging_enabled = tk.BooleanVar(value=self._settings.get("logging_enabled", True))
         self._page_count = tk.IntVar(value=self._settings.get("scan_page_count", 10))
@@ -105,7 +105,7 @@ class SettingsDialog(tk.Toplevel):
         theme_row = ttk.Frame(tab1)
         theme_row.pack(fill=tk.X)
         from src.ui import ui_kit
-        theme_combo = ui_kit.make_combo(theme_row, ["clam", "alt", "vista", "xpnative"], width=10)
+        theme_combo = ui_kit.make_combo(theme_row, ["vista", "clam", "alt", "xpnative"], width=10)
         theme_combo.configure(textvariable=self._theme_var)
         theme_combo.bind("<<ComboboxSelected>>", self._on_theme_selected)
         theme_combo.pack(side=tk.LEFT)

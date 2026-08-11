@@ -16,7 +16,7 @@ SETTINGS_PATH = Path("cache/settings.json")
 
 # 全局设置（不分账户）
 DEFAULT_SETTINGS = {
-    "theme": "clam",   # ttk 主题：clam/alt/vista/xpnative
+    "theme": "vista",   # ttk 主题：clam/alt/vista/xpnative（默认 vista 原生外观）
     "ocr_debug_save": False,
     "scan_page_count": 100,
     "scan_scroll_px": 1200,

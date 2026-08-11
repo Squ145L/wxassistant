@@ -46,20 +46,53 @@ COLOR_MUTED = "#888888"     # 弱化文字（灰）
 COLOR_BLOCK = "#eef1f5"     # 浅色背景块（块分区：用背景区分区域，不用分割线）
 
 
-def configure_style(root: Optional[tk.Tk] = None, theme: str = "clam") -> None:
-    """配置全局 ttk 样式：指定主题 + 命名按钮/标签样式。
+def _borrow_clam_element(style: ttk.Style, elem_name: str, source: str) -> str:
+    """从 clam 主题借用控件元素（原样返回 elem_name）。
 
-    入口调用一次即可（main_window 传用户设置的 theme）。按钮工厂的 variant
-    参数会映射到这里的命名样式。切主题时重调本函数（theme_use 后需重新
-    configure 命名样式，否则新主题下 variant 会退化为默认按钮）。
+    vista/xpnative 等原生主题忽略控件的 background 覆盖；从 clam 借元素
+    创建的样式会强制背景色生效，因此彩色按钮/浅色块在原生主题下也不丢色。
+    """
+    try:
+        style.element_create(elem_name, "from", "clam", source)
+    except tk.TclError:
+        pass  # 元素已存在
+    return elem_name
+
+
+def _setup_colored_button(style: ttk.Style, name: str, color: str) -> None:
+    """配置一个彩色按钮样式（Primary/Success/Danger），跨主题显示背景色"""
+    elem = _borrow_clam_element(style, "ui.ColoredButton", "Button.button")
+    style_name = f"{name}.TButton"
+    style.layout(style_name, [
+        (elem, {"sticky": "nswe", "children": [
+            ("Button.focus", {"sticky": "nswe", "children": [
+                ("Button.label", {"sticky": "nswe"})]})]})])
+    style.configure(style_name, background=color, foreground="white")
+    style.map(style_name, background=[("active", color), ("pressed", color)])
+
+
+def _setup_block_frame(style: ttk.Style) -> None:
+    """浅色背景块样式：借用 clam 元素，原生主题下也显示块背景"""
+    elem = _borrow_clam_element(style, "ui.BlockFrame", "Frame.border")
+    style.layout("Block.TFrame", [
+        (elem, {"sticky": "nswe", "children": [("Frame.client", {"sticky": "nswe"})]})])
+    style.configure("Block.TFrame", background=COLOR_BLOCK)
+
+
+def configure_style(root: Optional[tk.Tk] = None, theme: str = "vista") -> None:
+    """配置全局 ttk 样式：指定主题 + 命名按钮/标签样式（跨主题彩色）。
+
+    入口调用一次即可（main_window 传用户设置的 theme）。彩色按钮/浅色块
+    通过借用 clam 元素实现，vista/xpnative 等原生主题下也不会丢色。
+    切主题时重调本函数（theme_use 后需重新 configure 命名样式）。
     """
     style = ttk.Style(root)
     style.theme_use(theme)
-    style.configure("Primary.TButton", foreground="white", background=COLOR_PRIMARY)
-    style.configure("Success.TButton", foreground="white", background=COLOR_SUCCESS)
-    style.configure("Danger.TButton", foreground="white", background=COLOR_DANGER)
+    _setup_colored_button(style, "Primary", COLOR_PRIMARY)
+    _setup_colored_button(style, "Success", COLOR_SUCCESS)
+    _setup_colored_button(style, "Danger", COLOR_DANGER)
     style.configure("Muted.TLabel", foreground=COLOR_MUTED)
-    style.configure("Block.TFrame", background=COLOR_BLOCK)
+    _setup_block_frame(style)
 
 
 def make_button(parent, text: str, width: int = 0, variant: str = "",

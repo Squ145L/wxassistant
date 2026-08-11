@@ -33,7 +33,7 @@ class MainWindow:
         self.root = tk.Tk()
         # 集中样式（应用用户选的主题）+ 窗口默认（minsize 防折叠、初始尺寸、居中）
         from src.utils.settings_store import load_settings
-        ui_kit.configure_style(self.root, load_settings().get("theme", "clam"))
+        ui_kit.configure_style(self.root, load_settings().get("theme", "vista"))
         ui_kit.window_defaults(self.root, WINDOW_TITLE, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
         self._friend_service = None
