@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from src.utils.calibration import reset_calibration
+from src.utils.coordinates import (
+    save_coordinates, account_has_override, should_save_coordinates,
+    DEFAULT_COORDINATES,
+)
 from src.utils.settings_store import (
     DEFAULT_SETTINGS,
     load_scan_settings,
@@ -304,6 +308,7 @@ class SettingsDialog(tk.Toplevel):
 
         self._all_coord_keys: list[str] = []
         coords = load_coordinates(self._account_name)
+        self._coord_loaded = coords
 
         # 滚动区（坐标多时避免溢出）
         canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
@@ -386,10 +391,13 @@ class SettingsDialog(tk.Toplevel):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _save_coordinates(self) -> None:
-        """收集坐标输入框的值并保存"""
+        """收集坐标输入框的值并保存
+
+        未改动且该账户无专属文件 → 跳过（保持继承全局）；
+        已改动或已有专属文件 → 写入账户专属文件。
+        """
         if not self._coord_vars:
             return
-        from src.utils.coordinates import save_coordinates, DEFAULT_COORDINATES
         coords = {}
         for key, (xv, yv) in self._coord_vars.items():
             try:
@@ -398,6 +406,10 @@ class SettingsDialog(tk.Toplevel):
                 coords[key] = (x, y)
             except ValueError:
                 coords[key] = DEFAULT_COORDINATES.get(key, (0.0, 0.0))
+        if not should_save_coordinates(
+                coords, getattr(self, "_coord_loaded", {}),
+                account_has_override(self._account_name)):
+            return  # 没改任何值、也无专属文件 → 保持继承全局
         save_coordinates(coords, self._account_name)
 
     @staticmethod

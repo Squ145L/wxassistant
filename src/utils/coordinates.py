@@ -117,6 +117,30 @@ def reset_coordinates() -> None:
     logger.info("坐标配置已重置为默认值")
 
 
+def account_has_override(account_name: Optional[str] = None) -> bool:
+    """是否存在账户专属坐标文件（None = 全局文件是否已存在）"""
+    return _coordinates_path(account_name).exists()
+
+
+def should_save_coordinates(
+    current: dict[str, Tuple[float, float]],
+    loaded: dict[str, Tuple[float, float]],
+    has_override: bool,
+) -> bool:
+    """是否应保存坐标：账户已有专属文件，或任一坐标值与加载值不同
+
+    按 4 位小数比较（与设置界面输入框的显示精度一致），避免
+    存储层浮点长精度把「未改动」误判为「已改动」而冻结继承。
+    """
+    if has_override:
+        return True
+    loaded_fmt = {k: (f"{v[0]:.4f}", f"{v[1]:.4f}") for k, v in loaded.items()}
+    for key, (x, y) in current.items():
+        if (f"{x:.4f}", f"{y:.4f}") != loaded_fmt.get(key):
+            return True
+    return False
+
+
 # ================================================================
 # OCR 校准区域解析（兼容旧格式像素值 → 新格式百分比）
 # ================================================================
