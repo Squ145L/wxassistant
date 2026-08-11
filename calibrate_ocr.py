@@ -37,9 +37,9 @@ BAR_H = 60
 # OCR 区域 → 参考图文件名（截图放入 帮助/pngs/ 后自动显示，同坐标校准的缩略图引导）
 HELP_DIR = PROJECT_DIR / "帮助" / "pngs"
 OCR_HELP_IMAGES = {
-    "chat_title": "ocr_聊天标题.png",
-    "contacts_list": "ocr_通讯录区域.png",
-    "search_panel": "ocr_搜索面板.png",
+    "chat_title": "OCR聊天界面标题.png",
+    "contacts_list": "OCR通讯录区域.png",
+    "search_panel": "OCR搜索面板.png",
 }
 
 
