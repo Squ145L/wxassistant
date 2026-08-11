@@ -72,11 +72,10 @@ def make_button(parent, text: str, width: int = 0, variant: str = "",
         width:    字符宽（0 = 自适应内容）
         variant:  配色：""（默认）/ primary / success / danger
         command:  点击回调
-        font:     字体元组，如 ("Microsoft YaHei", 10)；None = 默认
+        font:     保留参数但忽略 —— ttk.Button 不支持 -font 选项，传了会抛 TclError
     """
     style = f"{variant.title()}.TButton" if variant else None
-    return ttk.Button(parent, text=text, width=width, style=style,
-                      command=command, font=font)
+    return ttk.Button(parent, text=text, width=width, style=style, command=command)
 
 
 def make_label(parent, text: str, muted: bool = False,

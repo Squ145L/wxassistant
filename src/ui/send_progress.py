@@ -71,14 +71,14 @@ class SendProgress(ttk.Frame):
 
         self._btn_stop = ui_kit.make_button(
             btn_frame, "⏹ 终止", 0, variant="danger",
-            command=self._on_stop_clicked, font=("Microsoft YaHei", 10),
+            command=self._on_stop_clicked,
         )
         self._btn_stop.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
         self._btn_stop.config(state=tk.DISABLED)
 
         self._btn_start = ui_kit.make_button(
             btn_frame, "▶ 开始群发", 0, variant="success",
-            command=self._on_start_clicked, font=("Microsoft YaHei", 10),
+            command=self._on_start_clicked,
         )
         self._btn_start.pack(side=tk.RIGHT)
 
