@@ -17,7 +17,6 @@ from src.utils.config import (
 from src.utils.coordinates import get_coord
 from src.utils.logger import set_ui_callback
 from src.ui import ui_kit
-from src.ui.filter_bar import FilterBar
 from src.ui.friend_list import FriendList
 from src.ui.message_editor import MessageEditor
 from src.ui.send_progress import SendProgress
@@ -131,7 +130,7 @@ class MainWindow:
         self.set_friend_service(service)
         self.friend_list.select_none()
         # 清空上一条账户残留的搜索/正则/标签筛选，再刷新到当前账户全量列表
-        self.filter_bar.clear_filter()
+        self.friend_list.clear_filter()
 
     # ================================================================
     # UI 构建
@@ -172,12 +171,10 @@ class MainWindow:
         left = ui_kit.make_block(main_paned, width=LEFT_PANEL_WIDTH)
         main_paned.add(left, minsize=LEFT_MIN_PANEL_WIDTH)   # 380 ≥ 操作行固定控件总宽
 
-        self.filter_bar = FilterBar(left)
-        self.filter_bar.pack(fill=tk.X, padx=ui_kit.PAD_M, pady=(ui_kit.PAD_M, 0))
-        self.filter_bar.set_on_tag_filter(self._on_tag_filter_changed)
-
+        # 筛选/搜索/全选 已内嵌在 friend_list 块内（Task 4 下沉）
         self.friend_list = FriendList(left)
         self.friend_list.pack(fill=tk.BOTH, expand=True, padx=ui_kit.PAD_M, pady=ui_kit.PAD_M)
+        self.friend_list.set_on_tag_filter(self._on_tag_filter_changed)
 
         right = ui_kit.make_block(main_paned)
         main_paned.add(right, minsize=260)   # 编辑区可读下限
@@ -186,7 +183,7 @@ class MainWindow:
         self.message_editor.pack(fill=tk.BOTH, expand=True, padx=ui_kit.PAD_M, pady=ui_kit.PAD_M)
 
     def _wire_events(self):
-        self.filter_bar.bind("<<FilterChanged>>", lambda _e: self._apply_filter())
+        self.friend_list.bind("<<FilterChanged>>", lambda _e: self._apply_filter())
         self.friend_list.set_callbacks(
             on_add=self._handle_add,
             on_delete=self._handle_delete,
@@ -208,51 +205,51 @@ class MainWindow:
 
     def _reload_from_service(self):
         if self._friend_service:
-            self.filter_bar.set_tag_options(self._friend_service.all_tags())
+            self.friend_list.set_tag_options(self._friend_service.all_tags())
             self._apply_filter()
 
     def _apply_filter(self):
         if not self._friend_service:
             return
 
-        text = self.filter_bar.filter_text
-        use_regex = self.filter_bar.is_regex_mode
+        text = self.friend_list.filter_text
+        use_regex = self.friend_list.is_regex_mode
         all_friends = self._friend_service.all_friends
 
         if not text:
             filtered = list(all_friends)
-            self.filter_bar.set_regex_error("")
-            self.filter_bar.set_regex_hint("")
+            self.friend_list.set_regex_error("")
+            self.friend_list.set_regex_hint("")
         elif use_regex:
             try:
                 from src.services.friend_service import FriendService
                 compiled = FriendService.try_compile_regex(text)
                 if compiled is None:
-                    self.filter_bar.set_regex_error("正则语法错误")
+                    self.friend_list.set_regex_error("正则语法错误")
                     return
-                self.filter_bar.set_regex_error("")
+                self.friend_list.set_regex_error("")
                 filtered = [f for f in all_friends if compiled.search(f.name)]
                 if compiled.groups > 0:
-                    self.filter_bar.set_regex_hint(
+                    self.friend_list.set_regex_hint(
                         f"{compiled.groups} 个捕获组 -> [$1]...[${compiled.groups}] 可用于模板"
                     )
                 else:
-                    self.filter_bar.set_regex_hint("正则匹配模式")
+                    self.friend_list.set_regex_hint("正则匹配模式")
             except Exception:
-                self.filter_bar.set_regex_error("正则匹配异常")
+                self.friend_list.set_regex_error("正则匹配异常")
                 return
         else:
             filtered = [f for f in all_friends if f.name.startswith(text)]
-            self.filter_bar.set_regex_error("")
-            self.filter_bar.set_regex_hint("")
+            self.friend_list.set_regex_error("")
+            self.friend_list.set_regex_hint("")
 
         # 标签筛选（和名字筛选是 AND 关系）
-        tag = self.filter_bar.tag_filter
+        tag = self.friend_list.tag_filter
         if tag:
             filtered = [f for f in filtered if getattr(f, "tag", "") == tag]
 
         self.friend_list.set_friends(filtered)
-        self.filter_bar.set_match_count(len(filtered), len(all_friends))
+        self.friend_list.set_match_count(len(filtered), len(all_friends))
         self._sync_selected_count()
 
     def update_friend_list(self, friends: list, keyword: str = ""):
@@ -278,7 +275,7 @@ class MainWindow:
         if self._friend_service:
             ok = self._friend_service.set_tag(name, tag)
             if ok:
-                self.filter_bar.set_tag_options(self._friend_service.all_tags())
+                self.friend_list.set_tag_options(self._friend_service.all_tags())
                 self._apply_filter()
             return ok
         return False
@@ -287,11 +284,11 @@ class MainWindow:
         self._apply_filter()
 
     def _on_batch_tag_clicked(self) -> None:
-        """FilterBar 的 🏷 标签按钮 → 调用 FriendList 的批量标签"""
+        """🏷 标签按钮 → 调用 FriendList 的批量标签"""
         self.friend_list._batch_set_tag()
 
     def _on_clear_tags_clicked(self) -> None:
-        """FilterBar 的清除标签按钮 → 清除选中联系人的标签"""
+        """清除标签按钮 → 清除选中联系人的标签"""
         names = [f.name for f in self.friend_list._friends
                  if self.friend_list._check_vars.get(f.name, tk.BooleanVar(value=True)).get()]
         if not names:
@@ -651,7 +648,7 @@ class MainWindow:
 
         attachments = self.message_editor.get_attachments()
         interval = self.message_editor.get_interval()
-        regex_pattern = self.filter_bar.filter_text if self.filter_bar.is_regex_mode else ""
+        regex_pattern = self.friend_list.filter_text if self.friend_list.is_regex_mode else ""
 
         logger.info("发起群发: %d 人, 间隔 %.1fs, %d 附件",
                      len(selected), interval, len(attachments))
@@ -801,7 +798,7 @@ class MainWindow:
     def _set_ui_sending(self, sending: bool):
         self._set_busy(sending)
         self.send_progress.set_running(sending)
-        self.filter_bar.set_enabled(not sending)
+        self.friend_list.set_enabled(not sending)
         self.top_bar.set_enabled(not sending)
         self.message_editor.set_enabled(not sending)
         if sending:

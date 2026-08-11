@@ -1,8 +1,10 @@
-"""好友列表面板 — Treeview + 内嵌 Checkbutton"""
+"""好友列表面板 — 顶部筛选行（搜索/正则/标签）+ Treeview + 底部操作行（全选/反选/删除）"""
 
 import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 from typing import Callable, Optional
+
+from src.ui import ui_kit
 
 
 class FriendList(ttk.Frame):
@@ -13,6 +15,15 @@ class FriendList(ttk.Frame):
         self._check_vars: dict[str, tk.BooleanVar] = {}
         self._failed_reasons: dict[str, str] = {}
         self._select_all_var = tk.BooleanVar(value=True)
+
+        # ---- 筛选状态（原 FilterBar 逻辑并入）----
+        self._filter_var = tk.StringVar()
+        self._filter_var.trace_add("write", self._on_filter_var_changed)
+        self._regex_mode = tk.BooleanVar(value=False)
+        self._regex_mode.trace_add("write", self._on_filter_var_changed)
+        self._tag_var = tk.StringVar(value="全部")
+        self._match_label_var = tk.StringVar(value="匹配 0/0 人")
+        self._on_tag_filter: Optional[Callable[[str], None]] = None
 
         self._on_add: Optional[Callable[[str], bool]] = None
         self._on_delete: Optional[Callable[[list], bool]] = None
@@ -41,36 +52,30 @@ class FriendList(ttk.Frame):
     # ================================================================
 
     def _build_ui(self):
-        top = ttk.Frame(self, padding=(4, 4, 4, 2))
-        top.pack(fill=tk.X)
+        # ---- 顶部筛选行（下沉自 filter_bar）：搜索框(固定≈8汉字) + .* + 标签▾ + 匹配计数 ----
+        filter_row = ttk.Frame(self)
+        filter_row.pack(fill=tk.X, padx=ui_kit.PAD_S, pady=(ui_kit.PAD_S, 0))
 
-        self._cb_select_all = ttk.Checkbutton(
-            top, text="全选", variable=self._select_all_var,
-            command=self._on_select_all_toggle,
-        )
-        self._cb_select_all.pack(side=tk.LEFT)
+        self._filter_entry = ttk.Entry(filter_row, textvariable=self._filter_var,
+                                       font=("Consolas", 10), width=16)
+        self._filter_entry.pack(side=tk.LEFT)
+        ttk.Button(filter_row, text="✕", width=3, command=self.clear_filter).pack(
+            side=tk.LEFT, padx=(ui_kit.PAD_XS, 0))
+        self._cb_regex = ttk.Checkbutton(filter_row, text=".*", variable=self._regex_mode)
+        self._cb_regex.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        ttk.Label(filter_row, text="标签:").pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        self._tag_combo = ttk.Combobox(filter_row, textvariable=self._tag_var,
+                                       values=["全部"], state="readonly", width=6)
+        self._tag_combo.pack(side=tk.LEFT, padx=(ui_kit.PAD_XS, 0))
+        self._tag_combo.bind("<<ComboboxSelected>>", self._on_tag_selected)
+        ui_kit.Spacer(filter_row).pack(side=tk.LEFT, fill=tk.X, expand=True)  # 弹性区防折叠
+        self._regex_hint = ttk.Label(filter_row, text="", foreground="#2196F3", font=("", 8))
+        self._regex_hint.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+        self._match_label = ttk.Label(filter_row, textvariable=self._match_label_var,
+                                      foreground="gray", font=("", 9))
+        self._match_label.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
 
-        ttk.Separator(top, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=8, fill=tk.Y)
-
-        self._btn_add = ttk.Button(top, text="➕", width=3, command=self._pop_add_menu)
-        self._btn_add.pack(side=tk.LEFT, padx=2)
-
-        self._add_menu = tk.Menu(self, tearoff=0)
-        self._add_menu.add_command(label="手动添加", command=self._add_friend)
-        self._add_menu.add_command(label="搜索并导入", command=self._on_search_menu)
-        self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
-
-        ttk.Button(top, text="反选", width=4, command=self.invert_selection).pack(side=tk.LEFT, padx=2)
-        # 删除：ttk 样式统一（和反选一致）+ 红字警示
-        style = ttk.Style()
-        style.configure("Danger.TButton", foreground="#D32F2F")
-        ttk.Button(top, text="删除", style="Danger.TButton", width=4,
-                   command=self._delete_friend).pack(side=tk.LEFT, padx=2)
-
-        self._label_count = ttk.Label(top, text="", foreground="gray", font=("", 9))
-        self._label_count.pack(side=tk.RIGHT)
-
-        ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X)
+        ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(ui_kit.PAD_S, 0))
 
         # Treeview（名称列 + 内嵌 Checkbutton）
         tree_frame = ttk.Frame(self)
@@ -108,6 +113,100 @@ class FriendList(ttk.Frame):
         self._tree.bind("<Button-3>", self._on_right_click)
 
         self._tree.tag_configure("failed", foreground="red")
+
+        # ---- 底部操作行：➕/删除 (Spacer) 共N人 全选 反选 ----
+        bottom = ttk.Frame(self)
+        bottom.pack(fill=tk.X, padx=ui_kit.PAD_S, pady=(ui_kit.PAD_S, 0))
+        self._btn_add = ttk.Button(bottom, text="➕", width=3, command=self._pop_add_menu)
+        self._btn_add.pack(side=tk.LEFT)
+        self._add_menu = tk.Menu(self, tearoff=0)
+        self._add_menu.add_command(label="手动添加", command=self._add_friend)
+        self._add_menu.add_command(label="搜索并导入", command=self._on_search_menu)
+        self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
+        # 删除：走 ui_kit 的 Danger.TButton（configure_style 已定义）
+        ttk.Button(bottom, text="删除", style="Danger.TButton", width=4,
+                   command=self._delete_friend).pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        ui_kit.Spacer(bottom).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._label_count = ttk.Label(bottom, text="", foreground="gray", font=("", 9))
+        self._label_count.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+        self._cb_select_all = ttk.Checkbutton(
+            bottom, text="全选", variable=self._select_all_var,
+            command=self._on_select_all_toggle,
+        )
+        self._cb_select_all.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+        ttk.Button(bottom, text="反选", width=4, command=self.invert_selection).pack(side=tk.RIGHT)
+
+    # ================================================================
+    # 筛选（原 FilterBar 逻辑）
+    # ================================================================
+
+    @property
+    def filter_text(self) -> str:
+        return self._filter_var.get().strip()
+
+    @property
+    def is_regex_mode(self) -> bool:
+        return self._regex_mode.get()
+
+    @property
+    def tag_filter(self) -> str:
+        v = self._tag_var.get().strip()
+        return "" if v == "全部" else v
+
+    def set_on_tag_filter(self, callback: Callable[[str], None]) -> None:
+        self._on_tag_filter = callback
+
+    def set_tag_options(self, tags: list[str]) -> None:
+        cur = self._tag_var.get()
+        self._tag_combo["values"] = ["全部"] + list(tags)
+        if cur not in self._tag_combo["values"]:
+            self._tag_var.set("全部")
+
+    def set_match_count(self, matched: int, total: int) -> None:
+        self._match_label_var.set(f"匹配 {matched}/{total} 人")
+
+    def set_regex_error(self, message: str = "") -> None:
+        if message:
+            self._regex_hint.config(text=f"⚠ {message}", foreground="red")
+        else:
+            self._regex_hint.config(text="", foreground="#2196F3")
+
+    def set_regex_hint(self, text: str = "") -> None:
+        self._regex_hint.config(text=text, foreground="#2196F3")
+
+    def clear_filter(self) -> None:
+        """清空筛选文字 + 正则模式 + 标签筛选（账户切换时调用，防串账户）"""
+        self._filter_var.set("")
+        self._regex_mode.set(False)
+        self._tag_var.set("全部")
+        self.set_regex_error("")
+        self.set_regex_hint("")
+
+    def _on_filter_var_changed(self, *_args) -> None:
+        """搜索/正则变化 → 提示更新 + 触发外部重筛（<<FilterChanged>>）"""
+        from src.services.friend_service import FriendService
+        if self._regex_mode.get() and self.filter_text:
+            compiled = FriendService.try_compile_regex(self.filter_text)
+            if compiled is None:
+                self.set_regex_error("正则语法错误")
+            elif compiled.groups > 0:
+                self.set_regex_hint(f"{compiled.groups} 个捕获组 → [$1]…[${compiled.groups}] 可用")
+            else:
+                self.set_regex_hint("正则匹配模式")
+        else:
+            self.set_regex_error("")
+            self.set_regex_hint("")
+        self.event_generate("<<FilterChanged>>")
+
+    def set_enabled(self, enabled: bool) -> None:
+        """发送中禁用筛选控件（搜索框 + 正则开关）"""
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self._filter_entry.config(state=state)
+        self._cb_regex.config(state=state)
+
+    def _on_tag_selected(self, _event=None) -> None:
+        if self._on_tag_filter:
+            self._on_tag_filter(self.tag_filter)
 
     # ================================================================
     # 数据
