@@ -1,9 +1,6 @@
 # 运行时
 cache/
 logs/
-__pycache__/
-*.pyc
-*.pyo
 .pytest_cache/
 
 # 开发环境
@@ -23,9 +20,10 @@ Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# OCR 模型文件（太大，单独下载）
-OCR/models/*.onnx
-!OCR/models/.gitkeep
+# 各目录下的 Python 缓存（递归）
+**/__pycache__/
+*.py[cod]
+*$py.class
 
 # OMC agent state (sessions, tracking, replay)
 .omc/
