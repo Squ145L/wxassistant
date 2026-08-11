@@ -1,7 +1,8 @@
-"""账户文件路径工具 — 多账户模式的每账户文件路径与账户名规范化
+"""账户文件路径 — cache/按账户文件夹管理
 
-单账户使用全局文件（cache/friends.json 等）；多账户每账户一份：
-cache/friends_<账户名>.json、cache/coordinates_<账户名>.json、cache/ocr_calibration_<账户名>.json
+cache/<账户名>/{friends.json, settings.json, ocr_calibration.json, coordinates.json}
+cache/accounts.json 存账户名列表；cache/settings.json 存全局（不分账户的）设置。
+账户名只体现在文件夹名上，不写入任何 json 内容。
 """
 import re
 from pathlib import Path
@@ -16,7 +17,7 @@ _MAX_NAME_LEN = 32
 
 
 def sanitize_account_name(name: str) -> str:
-    """账户名 → 安全文件片段（去非法字符、压缩空白、截断、兜底 default）"""
+    """账户名 → 安全文件夹片段（去非法字符、压缩空白、截断、兜底 default）"""
     s = _INVALID_CHARS.sub("_", name.strip())
     s = _WHITESPACE.sub("_", s)
     if not s:
@@ -24,20 +25,30 @@ def sanitize_account_name(name: str) -> str:
     return s[:_MAX_NAME_LEN]
 
 
-def _per_account_path(prefix: str, account_name: str) -> Path:
-    return CACHE_DIR / f"{prefix}_{sanitize_account_name(account_name)}.json"
+def account_dir(account_name: str) -> Path:
+    """该账户的数据文件夹（cache/<sanitized>/）"""
+    return CACHE_DIR / sanitize_account_name(account_name)
+
+
+def _account_file(account_name: str, filename: str) -> Path:
+    return account_dir(account_name) / filename
 
 
 def friends_path_for(account_name: str) -> Path:
     """该账户的好友名单文件路径"""
-    return _per_account_path("friends", account_name)
+    return _account_file(account_name, "friends.json")
 
 
 def coordinates_path_for(account_name: str) -> Path:
-    """该账户的坐标覆盖文件路径（仅当该账户单独设置过才存在）"""
-    return _per_account_path("coordinates", account_name)
+    """该账户的坐标文件路径"""
+    return _account_file(account_name, "coordinates.json")
 
 
 def calibration_path_for(account_name: str) -> Path:
-    """该账户的 OCR 校准覆盖文件路径"""
-    return _per_account_path("ocr_calibration", account_name)
+    """该账户的 OCR 校准文件路径"""
+    return _account_file(account_name, "ocr_calibration.json")
+
+
+def account_settings_path_for(account_name: str) -> Path:
+    """该账户的设置文件路径"""
+    return _account_file(account_name, "settings.json")
