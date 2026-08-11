@@ -15,8 +15,10 @@ from src.utils.coordinates import (
 )
 from src.utils.settings_store import (
     DEFAULT_SETTINGS,
+    load_account_settings,
     load_scan_settings,
     load_settings,
+    save_account_settings,
     save_settings,
 )
 
@@ -51,7 +53,9 @@ class SettingsDialog(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self._on_close)  # X 按钮也保存
 
         self._settings = load_settings()
-        self._name_source = tk.StringVar(value=self._settings.get("name_source", "cache"))
+        # name_source 是账户级设置（每个账户独立）；None 账户名 → 默认账户
+        account_settings = load_account_settings(self._account_name or "")
+        self._name_source = tk.StringVar(value=account_settings.get("name_source", "cache"))
         self._ocr_debug = tk.BooleanVar(value=self._settings.get("ocr_debug_save", False))
         self._sousou_independent = tk.BooleanVar(value=self._settings.get("sousou_independent_enabled", False))
         self._logging_enabled = tk.BooleanVar(value=self._settings.get("logging_enabled", True))
@@ -72,17 +76,15 @@ class SettingsDialog(tk.Toplevel):
         self._center(parent)
 
     def _build_ui(self) -> None:
-        # 账户行（始终显示：多账户 = 可切下拉；单账户 = "全局"）
+        # 账户行（始终显示可切换下拉；单模式也有持久账户）
         acct_row = ttk.Frame(self)
         acct_row.pack(fill=tk.X, padx=8, pady=(8, 0))
         ttk.Label(acct_row, text="账户:", font=("Microsoft YaHei", 9)).pack(side=tk.LEFT)
-        if self._account_names:
-            self._account_combo = ttk.Combobox(
-                acct_row, values=self._account_names, state="readonly", width=12)
-            self._account_combo.set(self._account_name or self._account_names[0])
-            self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
-        else:
-            self._account_combo = ttk.Label(acct_row, text="全局（单账户）", foreground="gray")
+        names = self._account_names or ([self._account_name] if self._account_name else ["默认账户"])
+        self._account_combo = ttk.Combobox(
+            acct_row, values=names, state="readonly", width=12)
+        self._account_combo.set(self._account_name or names[0])
+        self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
         self._account_combo.pack(side=tk.LEFT, padx=(6, 0))
 
         nb = ttk.Notebook(self)
@@ -94,7 +96,7 @@ class SettingsDialog(tk.Toplevel):
         nb.add(tab1, text="常规")
 
         ttk.Label(tab1, text="发送的 name 来源:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Radiobutton(tab1, text="缓存加载  (从 cache/friends.json 读取)", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
+        ttk.Radiobutton(tab1, text="缓存加载", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(tab1, text="OCR 扫描  (扫描微信通讯录获取)", variable=self._name_source, value="ocr").pack(anchor=tk.W, pady=2)
 
         ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
@@ -198,7 +200,6 @@ class SettingsDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="关闭", command=self._on_close).pack(side=tk.RIGHT)
 
     def _on_close(self) -> None:
-        self._settings["name_source"] = self._name_source.get()
         self._settings["ocr_debug_save"] = self._ocr_debug.get()
         self._settings["sousou_independent_enabled"] = self._sousou_independent.get()
         self._settings["logging_enabled"] = self._logging_enabled.get()
@@ -212,6 +213,9 @@ class SettingsDialog(tk.Toplevel):
         self._settings["multi_open_send_interval"] = float(self._mo_send_interval.get())
         self._settings["multi_open_popup_retry"] = int(self._mo_popup_retry.get())
         save_settings(self._settings)
+        # name_source 是账户级设置
+        save_account_settings(self._account_name or "",
+                              {"name_source": self._name_source.get()})
         self._save_coordinates()
         self.destroy()
 
