@@ -41,6 +41,7 @@ class MainWindow:
         self._multi_session = multi_session      # Optional[MultiAccountSession]
         self._account_runtime: dict = {}          # name -> (bridge, friend_service)
         self._account_selection: dict[str, set] = {}  # 每个账户已勾选的联系人名（跨账户保留）
+        self._active_account: Optional[str] = None    # 当前显示/操作的账户（与 _account_var 解耦，防切换时序错乱）
         self._account_var: Optional[tk.StringVar] = None
         self._on_send: Optional[Callable] = None
         self._on_check_names: Optional[Callable] = None
@@ -127,9 +128,10 @@ class MainWindow:
         """切换到指定账户：换 bridge + friend_service（各账户勾选独立保留，可跨账户多选）"""
         if name not in self._account_runtime:
             return
-        self._save_current_selection()   # 保存当前账户勾选
+        self._save_current_selection()   # 保存当前显示的账户勾选（用 _active_account）
+        self._active_account = name      # 更新当前显示账户（先于加载）
         if self._account_var is not None:
-            self._account_var.set(name)   # 同步当前账户（下拉/直接调用都一致）
+            self._account_var.set(name)   # 同步账户下拉（下拉/直接调用都一致）
         bridge, service = self._account_runtime[name]
         self.set_bridge(bridge)
         self.set_friend_service(service)
@@ -143,11 +145,15 @@ class MainWindow:
         self.friend_list.clear_filter()
 
     def _save_current_selection(self) -> None:
-        """把当前账户已勾选的联系人名存入 _account_selection（跨账户保留）"""
-        name = self._current_account_name()
-        if not name:
+        """把当前显示的账户已勾选的联系人名存入 _account_selection（跨账户保留）
+
+        用 _active_account（当前显示的账户）而非 _account_var：下拉切账户时
+        combobox 会先把 _account_var 改成新账户，此时再读 var 会把旧勾选存错 key。
+        """
+        if not self._active_account:
             return
-        self._account_selection[name] = {f.name for f in self.friend_list.get_selected()}
+        self._account_selection[self._active_account] = {
+            f.name for f in self.friend_list.get_selected()}
 
     def _gather_multi_selection(self) -> dict[str, list]:
         """多开：收集所有账户已勾选的联系人 {账户名: [好友]}，用于跨账户群发"""
