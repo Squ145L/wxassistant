@@ -1,21 +1,18 @@
-"""多开引导窗口 — 检测微信窗口 → 逐个前台确认账户名 → 生成会话
+"""多开引导窗口 — 检测微信窗口 → 逐个绑定到持久账户 → 生成会话
 
 流程：
 1. [检测微信窗口] 枚举所有微信主窗口
 2. [逐个确认账户] 对每个窗口 SetForegroundWindow 显示到最前，
-   弹输入框让用户确认账户名（默认 账户1/账户2…）
-3. 列表支持重命名/删除
+   弹选择框让用户选该窗口属于哪个持久账户（或新建账户）
+3. 列表支持重命名/删除（重命名 = 改绑到另一账户）
 4. [确定并进入多开] 返回 MultiAccountSession；[取消] 返回 None
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from typing import Any, Optional
 
+from src.services import account_registry as reg
 from src.services.multi_account import MultiAccountSession
-
-
-def _default_name(index: int) -> str:
-    return f"账户{index + 1}"
 
 
 class MultiOpenWizard:
@@ -99,34 +96,60 @@ class MultiOpenWizard:
         if not self._frames:
             messagebox.showwarning("提示", "请先点击「检测微信窗口」。")
             return
+        accounts = reg.load_accounts()
         start = len(self._session.accounts)
         for i in range(start, len(self._frames)):
             hwnd, title, _cls = self._frames[i]
             if not self.bridge.activate_hwnd(hwnd):
                 messagebox.showwarning("提示", f"无法激活窗口 0x{hwnd:X}（可能被前台锁定），跳过。")
                 continue
-            name = simpledialog.askstring(
-                "确认账户",
-                f"窗口 {i + 1}/{len(self._frames)}\n当前显示在最前的微信窗口是哪个账户？\n\n标题: {title}",
-                initialvalue=self._next_available_default(_default_name(i)),
-                parent=self.root,
-            )
+            name = self._pick_account(i + 1, len(self._frames), title, accounts)
             if name is None:
-                break  # 用户点了取消 → 停止逐个确认，保留已确认的
-            name = name.strip() or self._next_available_default(_default_name(i))
+                break  # 取消 → 停止逐个确认，保留已确认的
             if not self._session.add(name=name, hwnd=hwnd):
-                messagebox.showwarning(
-                    "提示", f"账户名 '{name}' 与已有账户冲突（或窗口已绑定），跳过。")
+                messagebox.showwarning("提示", f"窗口已绑定给 [{name}]，或账户冲突，跳过。")
         self._refresh_tree()
 
-    def _next_available_default(self, base: str) -> str:
-        """返回未占用的默认名（默认名撞已有账户时自动加 _2/_3…）"""
-        name = base
-        n = 2
-        while any(a.name == name for a in self._session.accounts):
-            name = f"{base}_{n}"
-            n += 1
-        return name
+    def _pick_account(self, idx: int, total: int, title: str,
+                      accounts: list[str]) -> Optional[str]:
+        """弹选择框：选已有持久账户 / 新建账户。取消返回 None。"""
+        dlg = tk.Toplevel(self.root)
+        dlg.title(f"窗口 {idx}/{total} 绑定账户")
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+        ttk.Label(dlg, text=f"当前前台微信窗口属于哪个账户？\n窗口标题: {title}",
+                  justify=tk.LEFT).pack(padx=16, pady=(12, 6))
+        var = tk.StringVar(value=accounts[0] if accounts else "")
+        combo = ttk.Combobox(dlg, textvariable=var, values=accounts + ["＋ 新建账户…"],
+                             state="readonly", width=18)
+        combo.pack(padx=16, pady=4)
+        result: list[Optional[str]] = [None]
+
+        def _ok():
+            v = var.get()
+            if v == "＋ 新建账户…":
+                n = simpledialog.askstring("新建账户", "账户名:", parent=dlg)
+                if n and n.strip():
+                    n = n.strip()
+                    if n in accounts:
+                        messagebox.showwarning("提示", "账户已存在。", parent=dlg)
+                        return
+                    accounts.append(n)
+                    reg.save_accounts(list(accounts))
+                    result[0] = n
+                    dlg.destroy()
+                return
+            if v:
+                result[0] = v
+                dlg.destroy()
+
+        btn = ttk.Frame(dlg)
+        btn.pack(pady=(8, 12))
+        ttk.Button(btn, text="确定", command=_ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn, text="取消", command=dlg.destroy).pack(side=tk.LEFT, padx=4)
+        dlg.wait_window()
+        return result[0]
 
     # ---- 列表操作 ----
     def _refresh_tree(self):
@@ -145,11 +168,11 @@ class MultiOpenWizard:
         if idx is None:
             return
         acc = self._session.accounts[idx]
-        new_name = simpledialog.askstring(
-            "重命名", "新账户名:", initialvalue=acc.name, parent=self.root)
-        if new_name and new_name.strip():
-            if not self._session.rename(idx, new_name.strip()):
-                messagebox.showwarning("提示", "重命名失败：账户名重复或为空。")
+        accounts = reg.load_accounts()
+        new_name = self._pick_account(acc.order + 1, len(self._frames), acc.name, accounts)
+        if new_name and new_name != acc.name:
+            if not self._session.rename(idx, new_name):
+                messagebox.showwarning("提示", "重命名失败：账户名冲突。")
         self._refresh_tree()
 
     def _on_delete(self):
