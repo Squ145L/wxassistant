@@ -272,3 +272,16 @@ foreground_lock = threading.Lock()
 - 账户专属校准工具的完整验证（`calibrate_ocr.py --account` 需真实多开确认）
 - `LEFT_PANEL_WIDTH`/`LEFT_MIN_PANEL_WIDTH` 当前 200/380（min 覆盖初始，待用户定稿语义）
 - UI 视觉微调可能还有后续（用户反馈驱动）
+
+### review 修复批次（2026-08-11）
+
+分支 `feature/multi-account-phase1`，`docs/superpowers/plans/2026-08-11-multi-account-phase1-fixes.md` 全部交付（12 项 review 问题）：
+- OCR 校准两级回退统一模块（`src/utils/calibration.py`，全局→账户→默认），四处读取方接入
+- 跨账户操作锁定（检查/扫描/导入期间禁用账户下拉 + 发送/操作互斥）
+- 账户名 sanitize 碰撞去重 + 重复 hwnd 拦截 + rename 越界保护
+- 设置关闭不编辑不再冻结账户坐标继承（精度容差比较）
+- 校准预检账户感知（继承全局也算已校准）
+- 引导窗口去掉 ui→driver 依赖；激活加前台校验重试；重检测重置会话
+- app 顶层模式循环消除嵌套 mainloop
+- 账户切换清空筛选
+- save_cache 同步落盘（共享锁）

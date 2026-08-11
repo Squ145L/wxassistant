@@ -26,7 +26,6 @@ from src.utils.calibration import DEFAULT_CALIBRATION, load_calibration, save_ca
 PROJECT_DIR = Path(__file__).resolve().parent
 CACHE_DIR = PROJECT_DIR / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-CONFIG_PATH = CACHE_DIR / "ocr_calibration.json"
 ACCOUNT = None  # --account 参数（多开时按账户保存校准）
 
 _DESC = {"chat_title": "聊天标题栏", "search_panel": "搜索面板", "contacts_list": "通讯录列表"}
