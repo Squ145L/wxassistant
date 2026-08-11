@@ -83,14 +83,17 @@ class TopBar(ttk.Frame):
         self._btn_settings = ttk.Button(self, text="设置", width=4, command=self._make_cmd("_on_settings"))
         self._btn_help = ttk.Button(self, text="帮助", width=4, command=self._make_cmd("_on_help"))
         self._btn_multiopen = ttk.Button(self, text="多开", width=7, command=self._make_cmd("_on_multiopen"))
+        self._btn_account_mgr = ttk.Button(self, text="账户管理", width=6,
+                                           command=self._make_cmd("_on_account_manager"))
 
         # pack 顺序：右侧按钮从右往左
         self._btn_multiopen.pack(side=tk.RIGHT, padx=(4, 2))
         self._btn_settings.pack(side=tk.RIGHT, padx=4)
         self._btn_help.pack(side=tk.RIGHT, padx=4)
         self._btn_refresh.pack(side=tk.RIGHT, padx=4)
-        # 左侧：联系人 / 标签菜单
+        # 左侧：联系人 / 账户管理 / 标签
         self._btn_tags.pack(side=tk.LEFT, padx=(8, 0))
+        self._btn_account_mgr.pack(side=tk.LEFT, padx=(8, 0))
         self._btn_contacts.pack(side=tk.LEFT, padx=(8, 0))
         # 账户（始终显示：账户: [combo]，单/多模式都有账户可切）
         self._account_label.pack(side=tk.LEFT)
@@ -140,6 +143,7 @@ class TopBar(ttk.Frame):
         self._btn_multiopen.config(state=state)
         self._btn_contacts.config(state=state)
         self._btn_tags.config(state=state)
+        self._btn_account_mgr.config(state=state)
         self.set_account_enabled(enabled)
 
     def set_account_enabled(self, enabled: bool) -> None:

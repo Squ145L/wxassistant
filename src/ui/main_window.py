@@ -151,6 +151,7 @@ class MainWindow:
         self.top_bar.set_on_settings(self._open_settings)
         self.top_bar.set_on_help(self._on_help_clicked)
         self.top_bar.set_on_multiopen(self._on_multiopen_clicked)
+        self.top_bar.set_on_account_manager(self._on_account_manager_clicked)
 
         # 账户选择器始终创建；账户列表由 set_account_runtime 填充
         self._account_var = tk.StringVar()
@@ -370,11 +371,37 @@ class MainWindow:
                 self._on_enter_multiopen()
 
     def _on_account_manager_clicked(self) -> None:
-        """打开账户管理弹窗：新建/重命名/删除/双击切换"""
+        """打开账户管理弹窗：新建/重命名/删除/双击切换。关闭后重建运行时。"""
         from src.ui.account_manager_dialog import AccountManagerDialog
         dlg = AccountManagerDialog(self.root, current=self._current_account_name() or "",
-                                   on_switch=self._switch_account)
+                                   on_switch=lambda name: self._refresh_accounts(name))
         dlg.grab_set()
+        dlg.wait_window()
+        self._refresh_accounts()   # 对话框可能新建/删除/重命名了账户，统一刷新
+
+    def _refresh_accounts(self, select_name: Optional[str] = None) -> None:
+        """账户列表变更后重建运行时（复用已有 bridge）+ 重选账户"""
+        from src.services.account_registry import load_accounts
+        from src.services.friend_service import FriendService
+        names = load_accounts()
+        new_runtime: dict[str, tuple] = {}
+        for name in names:
+            bridge = self._account_runtime.get(name, (None, None))[0]
+            if bridge is None:
+                bridge = self._bridge        # 单模式共享同一 bridge
+            if bridge is None:
+                continue                     # 多模式下新账户无窗口绑定，跳过
+            fs = FriendService.for_account(name)
+            fs.load_cache()
+            new_runtime[name] = (bridge, fs)
+        self._account_runtime = new_runtime
+        if not new_runtime:
+            return
+        self.top_bar.set_account_options(
+            list(new_runtime.keys()), self._account_var, self._on_account_selected)
+        target = select_name if select_name in new_runtime else list(new_runtime.keys())[0]
+        self._account_var.set(target)
+        self._switch_account(target)
 
     def _on_refresh(self) -> None:
         """刷新按钮：清除所有红色标记 + 重新连接微信窗口"""
