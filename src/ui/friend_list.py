@@ -21,7 +21,7 @@ class FriendList(ttk.Frame):
         self._filter_var.trace_add("write", self._on_filter_var_changed)
         self._regex_mode = tk.BooleanVar(value=False)
         self._regex_mode.trace_add("write", self._on_filter_var_changed)
-        self._tag_var = tk.StringVar(value="全部")
+        self._tag_var = tk.StringVar(value="选择标签")
         self._match_label_var = tk.StringVar(value="匹配 0/0 人")
         self._on_tag_filter: Optional[Callable[[str], None]] = None
         # 搜索框占位符（未输入时浅色 "搜索..."）
@@ -93,9 +93,8 @@ class FriendList(ttk.Frame):
             side=tk.LEFT, padx=(ui_kit.PAD_XS, 0))
         self._cb_regex = ttk.Checkbutton(filter_row, text=".*", variable=self._regex_mode)
         self._cb_regex.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
-        ttk.Label(filter_row, text="标签:").pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         self._tag_combo = ttk.Combobox(filter_row, textvariable=self._tag_var,
-                                       values=["全部"], state="readonly", width=6)
+                                       values=["选择标签"], state="readonly", width=8)
         self._tag_combo.pack(side=tk.LEFT, padx=(ui_kit.PAD_XS, 0))
         self._tag_combo.bind("<<ComboboxSelected>>", self._on_tag_selected)
         ui_kit.Spacer(filter_row).pack(side=tk.LEFT, fill=tk.X, expand=True)  # 弹性区防折叠
@@ -105,7 +104,7 @@ class FriendList(ttk.Frame):
                                       foreground="gray", font=("", 9))
         self._match_label.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
 
-        # ---- 操作行（搜索框下面一行）：全选 反选 标签▾ (Spacer) 已选x/y ➕ 删除 ----
+        # ---- 操作行（搜索框下面一行）：全选 反选 标签▾ ➕ 删除 (Spacer) 已选x/y ----
         actions = ttk.Frame(self)
         actions.pack(fill=tk.X, padx=ui_kit.PAD_S, pady=(ui_kit.PAD_S, 0))
         self._cb_select_all = ttk.Checkbutton(
@@ -123,12 +122,12 @@ class FriendList(ttk.Frame):
         self._btn_tags.config(
             command=lambda: self._toggle_menu(self._btn_tags, tags_menu))
         self._btn_tags.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
-        ui_kit.Spacer(actions).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        # 右侧（从右往左 pack）：删除 ➕ 已选x/y
+        # ➕添加 / 删除：左侧（紧挨"标签..."后）
+        self._btn_add = ttk.Button(actions, text="➕添加", width=6, command=self._pop_add_menu)
+        self._btn_add.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         ttk.Button(actions, text="删除", style="Danger.TButton", width=4,
-                   command=self._delete_friend).pack(side=tk.RIGHT)
-        self._btn_add = ttk.Button(actions, text="➕", width=3, command=self._pop_add_menu)
-        self._btn_add.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
+                   command=self._delete_friend).pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        ui_kit.Spacer(actions).pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._label_count = ttk.Label(actions, text="", foreground="gray", font=("", 9))
         self._label_count.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
         self._add_menu = tk.Menu(self, tearoff=0)
@@ -213,16 +212,16 @@ class FriendList(ttk.Frame):
     @property
     def tag_filter(self) -> str:
         v = self._tag_var.get().strip()
-        return "" if v == "全部" else v
+        return "" if v == "选择标签" else v
 
     def set_on_tag_filter(self, callback: Callable[[str], None]) -> None:
         self._on_tag_filter = callback
 
     def set_tag_options(self, tags: list[str]) -> None:
         cur = self._tag_var.get()
-        self._tag_combo["values"] = ["全部"] + list(tags)
+        self._tag_combo["values"] = ["选择标签"] + list(tags)
         if cur not in self._tag_combo["values"]:
-            self._tag_var.set("全部")
+            self._tag_var.set("选择标签")
 
     def set_match_count(self, matched: int, total: int) -> None:
         self._match_label_var.set(f"匹配 {matched}/{total} 人")
@@ -244,7 +243,7 @@ class FriendList(ttk.Frame):
         self._filter_entry.insert(0, self._placeholder_text)
         self._filter_entry.config(foreground="gray")
         self._regex_mode.set(False)
-        self._tag_var.set("全部")
+        self._tag_var.set("选择标签")
         self.set_regex_error("")
         self.set_regex_hint("")
 

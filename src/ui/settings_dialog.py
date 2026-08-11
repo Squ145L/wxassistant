@@ -79,7 +79,6 @@ class SettingsDialog(tk.Toplevel):
         # 账户行（始终显示可切换下拉；单模式也有持久账户）
         acct_row = ttk.Frame(self)
         acct_row.pack(fill=tk.X, padx=8, pady=(8, 0))
-        ttk.Label(acct_row, text="账户:", font=("Microsoft YaHei", 9)).pack(side=tk.LEFT)
         names = self._account_names or ([self._account_name] if self._account_name else ["默认账户"])
         self._account_combo = ttk.Combobox(
             acct_row, values=names, state="readonly", width=12)
@@ -365,9 +364,9 @@ class SettingsDialog(tk.Toplevel):
                            command=lambda k=key: self._test_coord_click(k)).grid(
                     row=0, column=5, padx=(0, 2))
 
-                # 重新校准按钮（有帮助图片才显示）
+                # 校准按钮（有帮助图片才显示）
                 if has_image_for(key):
-                    ttk.Button(row, text="重新校准",
+                    ttk.Button(row, text="校准",
                                command=lambda k=key: self._launch_coord_picker(k)).grid(
                         row=0, column=6)
 

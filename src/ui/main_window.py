@@ -364,10 +364,24 @@ class MainWindow:
         if state == guidance.READY_NEED_CALIB:
             key = calib_keys[0]
             label = guidance.CALIB_LABELS.get(key, key)
+            # 先聚焦目标窗口（微信/通讯录管理），提示窗口后出现不被遮挡
+            self._focus_target_for_calib(key)
             if self._ask_calibrate("OCR 校准", f"尚未校准 {label} 区域，\n是否现在校准？"):
                 self._launch_calibrate(key)
             return False
         return True
+
+    def _focus_target_for_calib(self, key: str) -> None:
+        """校准前把目标窗口聚焦到最前（避免提示/校准窗口被微信遮挡）"""
+        if not self._bridge:
+            return
+        try:
+            if key == "contacts_list":
+                self._bridge.open_contacts_manager()
+            else:
+                self._bridge.activate_window()
+        except Exception:
+            logger.exception("校准前聚焦目标窗口失败")
 
     def _ask_calibrate(self, title: str, message: str) -> bool:
         """自定义确认弹窗：左边「校准」右边「取消」。返回 True=点校准"""
@@ -376,6 +390,7 @@ class MainWindow:
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
+        dlg.attributes("-topmost", True)   # 确保提示不被微信遮挡
         result = [False]
         ttk.Label(dlg, text=message, justify=tk.LEFT).pack(padx=20, pady=(16, 12))
         btn = ttk.Frame(dlg)

@@ -287,7 +287,14 @@ def main():
     canvas.bind("<B1-Motion>", on_drag)
     canvas.bind("<ButtonRelease-1>", on_release)
 
-    root.after(100, lambda: [root.lift(), root.focus_force(), rebuild_display()])
+    def _raise_window():
+        """把校准窗口提到最前（topmost 短暂置顶，避免被微信遮挡）"""
+        root.attributes("-topmost", True)
+        root.lift()
+        root.focus_force()
+        rebuild_display()
+        root.after(800, lambda: root.attributes("-topmost", False))
+    root.after(100, _raise_window)
     root.mainloop()
 
 
