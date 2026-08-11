@@ -388,6 +388,7 @@ class MainWindow:
             return
         if not self._on_check_names:
             return
+        self._set_ops_active(False)
         self._stop_event = threading.Event()
         self._interrupt_poll_active = True
         self._was_interrupted = False
@@ -406,6 +407,7 @@ class MainWindow:
             return
         self.send_progress.set_status("正在搜索并导入...")
         self.send_progress.append_log(f"搜索: '{kw}'")
+        self._set_ops_active(False)
         self._stop_event = threading.Event()
         self._interrupt_poll_active = True
         self._was_interrupted = False
@@ -425,6 +427,7 @@ class MainWindow:
             return
         self.send_progress.set_status("正在扫描通讯录...")
         self.send_progress.clear_log()
+        self._set_ops_active(False)
         self._stop_event = threading.Event()
         self._interrupt_poll_active = True
         self._was_interrupted = False
@@ -774,6 +777,10 @@ class MainWindow:
         if sending:
             self.friend_list.select_none()
 
+    def _set_ops_active(self, active: bool) -> None:
+        """检查/搜索/导入操作期间锁定账户选择器，防止用户中途切换账户"""
+        self.top_bar.set_account_enabled(active)
+
     # ================================================================
     # 进度队列轮询
     # ================================================================
@@ -837,6 +844,7 @@ class MainWindow:
         elif msg_type == "__INTERRUPT_OFF__":
             self._interrupt_poll_active = False
             self._stop_event = None
+            self._set_ops_active(True)
 
         elif msg_type == "__SCAN_DONE_FOCUS__":
             _, page_count = msg
@@ -863,6 +871,7 @@ class MainWindow:
             _, diffs, failed = msg
             self._interrupt_poll_active = False
             self._stop_event = None
+            self._set_ops_active(True)
             self.send_progress.set_status("就绪")
             self.send_progress.set_running(False)
             self.friend_list.mark_failed(failed)

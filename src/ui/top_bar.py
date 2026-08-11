@@ -144,8 +144,16 @@ class TopBar(ttk.Frame):
         self._btn_multiopen.config(state=state)
         self._btn_contacts.config(state=state)
         self._btn_tags.config(state=state)
-        if self._multi:
-            self._account_combo.config(state="readonly" if enabled else tk.DISABLED)
+        self.set_account_enabled(enabled)
+
+    def set_account_enabled(self, enabled: bool) -> None:
+        """仅禁用账户下拉（检查/搜索/导入操作期间防切账户导致结果串账户）
+
+        set_enabled = 全部控件；本方法 = 只锁账户下拉。
+        """
+        if not self._multi:
+            return
+        self._account_combo.config(state="readonly" if enabled else tk.DISABLED)
 
     # ---- 回调注入 ----
     def set_on_account_change(self, cb): self._on_account_change = cb
