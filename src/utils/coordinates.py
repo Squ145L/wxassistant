@@ -28,9 +28,6 @@ DEFAULT_COORDINATES: dict[str, Tuple[float, float]] = {
     "cm_search_box":     (0.20, 0.03),   # 搜索框 — 顶部搜索输入框
     "cm_list_focus":     (0.71, 0.30),   # 列表聚焦点 — 联系人列表中间位置
 
-    # 搜一搜
-    "sousou_independent_btn": (0.00, 0.00),  # 搜一搜独立窗口按钮 — (0,0)=未配置，跳过
-
     # 安全区
     "safe_zone":         (0.30, 0.60),   # 安全区 — 窗口中间偏下，避免误折叠联系人
 }
@@ -44,7 +41,6 @@ COORD_LABELS: dict[str, str] = {
     "chat_dismiss":      "聊天区域点击(关闭弹窗)",
     "cm_search_box":     "通讯录管理-搜索框",
     "cm_list_focus":     "通讯录管理-列表聚焦",
-    "sousou_independent_btn": "搜一搜-独立窗口按钮",
     "safe_zone":         "安全区(防误折叠)",
 }
 
@@ -52,7 +48,6 @@ COORD_LABELS: dict[str, str] = {
 COORD_GROUPS = [
     ("微信主界面", ["tab_chat", "tab_contacts", "btn_contacts_mgr", "chat_first", "chat_dismiss"]),
     ("通讯录管理窗口", ["cm_search_box", "cm_list_focus"]),
-    ("搜一搜", ["sousou_independent_btn"]),
     ("其他", ["safe_zone"]),
 ]
 

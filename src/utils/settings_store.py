@@ -17,7 +17,6 @@ SETTINGS_PATH = Path("cache/settings.json")
 # 全局设置（不分账户）
 DEFAULT_SETTINGS = {
     "ocr_debug_save": False,
-    "sousou_independent_enabled": False,
     "scan_page_count": 100,
     "scan_scroll_px": 1200,
     "scan_pages_per_scroll": 12,

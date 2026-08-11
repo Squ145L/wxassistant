@@ -470,49 +470,10 @@ class WeChatBridge:
         time.sleep(SEARCH_DELAY)
         if self._should_stop(): return False
 
-        self._click_sousou_independent_btn(main_hwnd)
-
         if self._close_search_popup():
             logger.info("搜索弹窗已关闭，联系人不存在: '%s'", keyword)
             return False
         return True
-
-    def _click_sousou_independent_btn(self, main_hwnd: int = 0):
-        """搜一搜独立窗口处理：点击独立窗口按钮（设置开关+坐标非零时生效）
-
-        main_hwnd: 搜索前锁定的主窗口句柄，避免被浮层子窗口干扰。
-        """
-        try:
-            from src.utils.settings_store import load_settings
-            settings = load_settings()
-            if not settings.get("sousou_independent_enabled", False):
-                return
-        except Exception:
-            return
-
-        from src.utils.coordinates import get_coord
-        x_pct, y_pct = get_coord("sousou_independent_btn", self._account_name)
-        if x_pct == 0.0 and y_pct == 0.0:
-            return
-
-        # 直接用传入的主窗口 hwnd，不调用任何 find_window 或属性
-        if not main_hwnd:
-            main_hwnd = self._hwnd
-        if not main_hwnd or not win32gui.IsWindow(main_hwnd):
-            return
-        try:
-            rect = win32gui.GetWindowRect(main_hwnd)
-        except Exception:
-            return
-        ww = rect[2] - rect[0]
-        wh = rect[3] - rect[1]
-
-        cx = rect[0] + int(ww * x_pct)
-        cy = rect[1] + int(wh * y_pct)
-        logger.info("搜一搜独立窗口: hwnd=0x%X coord=(%.4f,%.4f) → 屏幕(%d,%d)",
-                    main_hwnd, x_pct, y_pct, cx, cy)
-        self.click_at(cx, cy)
-        time.sleep(0.3)
 
     def _close_search_popup(self) -> bool:
         """检测并关闭微信搜索弹窗

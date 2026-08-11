@@ -57,7 +57,6 @@ class SettingsDialog(tk.Toplevel):
         account_settings = load_account_settings(self._account_name or "")
         self._name_source = tk.StringVar(value=account_settings.get("name_source", "cache"))
         self._ocr_debug = tk.BooleanVar(value=self._settings.get("ocr_debug_save", False))
-        self._sousou_independent = tk.BooleanVar(value=self._settings.get("sousou_independent_enabled", False))
         self._logging_enabled = tk.BooleanVar(value=self._settings.get("logging_enabled", True))
         self._page_count = tk.IntVar(value=self._settings.get("scan_page_count", 10))
         self._scroll_px = tk.IntVar(value=self._settings.get("scan_scroll_px", 600))
@@ -98,12 +97,6 @@ class SettingsDialog(tk.Toplevel):
         ttk.Label(tab1, text="发送的 name 来源:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
         ttk.Radiobutton(tab1, text="缓存加载", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(tab1, text="OCR 扫描  (扫描微信通讯录获取)", variable=self._name_source, value="ocr").pack(anchor=tk.W, pady=2)
-
-        ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
-
-        ttk.Label(tab1, text="搜一搜:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Checkbutton(tab1, text="搜一搜独立窗口处理（搜索后弹窗前点击独立窗口按钮）",
-                        variable=self._sousou_independent).pack(anchor=tk.W)
 
         ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
 
@@ -199,7 +192,6 @@ class SettingsDialog(tk.Toplevel):
 
     def _on_close(self) -> None:
         self._settings["ocr_debug_save"] = self._ocr_debug.get()
-        self._settings["sousou_independent_enabled"] = self._sousou_independent.get()
         self._settings["logging_enabled"] = self._logging_enabled.get()
         self._settings["scan_page_count"] = self._page_count.get()
         self._settings["scan_scroll_px"] = self._scroll_px.get()

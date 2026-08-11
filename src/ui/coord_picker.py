@@ -20,7 +20,6 @@ HELP_IMAGES: dict[str, str] = {
     "tab_contacts":           "通讯录标签.png",
     "btn_contacts_mgr":       "通讯录管理按钮.png",
     "chat_first":             "聊天区域点击（第一个聊天）.png",
-    "sousou_independent_btn": "搜一搜独立窗口按钮.png",
     "cm_search_box":          "通讯录管理-搜索框.png",
     "cm_list_focus":          "通讯录管理-列表聚焦.png",
 }
