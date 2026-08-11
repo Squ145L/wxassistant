@@ -1,6 +1,4 @@
 # tests/test_friend_service_account.py
-import time
-
 import pytest
 
 from src.utils import account_paths as ap
@@ -14,19 +12,13 @@ def tmp_cache(tmp_path, monkeypatch):
     yield tmp_path
 
 
-def _wait_flush():
-    # FriendService.save_cache() 是异步 daemon 线程写文件，等待落盘
-    time.sleep(0.15)
-
-
 def test_for_account_isolates_files(tmp_cache):
+    # save_cache 现在是同步落盘，断言前无需等待
     fs_a = FriendService.for_account("账户A")
     fs_b = FriendService.for_account("账户B")
 
     fs_a.add_friend("张三")
-    _wait_flush()
     fs_b.add_friend("李四")
-    _wait_flush()
 
     # 各自从自己的文件加载
     fs_a2 = FriendService.for_account("账户A")

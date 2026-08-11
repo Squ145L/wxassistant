@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +19,10 @@ class FriendDTO:
     """好友数据"""
     name: str
     tag: str = ""
+
+
+# 跨实例共享的写锁：多账户并发写各自文件时防互相覆盖
+_SAVE_LOCK = threading.Lock()
 
 
 class FriendService:
@@ -62,24 +67,17 @@ class FriendService:
             return False
 
     def save_cache(self):
+        """同步落盘（小 JSON，毫秒级）。跨实例共享锁防并发写互相覆盖。"""
         self._cache_path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "updated_at": time.time(),
             "count": len(self._friends),
             "friends": [{"name": f.name, "tag": f.tag} for f in self._friends],
         }
-        import threading as _thr
-        _save_lock = getattr(self.__class__, '_save_lock', None)
-        if _save_lock is None:
-            self.__class__._save_lock = _thr.Lock()
-            _save_lock = self.__class__._save_lock
-
-        def _write():
-            dump = json.dumps(data, ensure_ascii=False, indent=2)
-            with _save_lock:
-                self._cache_path.write_text(dump, encoding="utf-8")
-        _thr.Thread(target=_write, daemon=True).start()
-        logger.debug("缓存调度保存: %d 位好友", len(self._friends))
+        dump = json.dumps(data, ensure_ascii=False, indent=2)
+        with _SAVE_LOCK:
+            self._cache_path.write_text(dump, encoding="utf-8")
+        logger.debug("缓存已保存: %d 位好友", len(self._friends))
 
     # ================================================================
     # 手动管理
