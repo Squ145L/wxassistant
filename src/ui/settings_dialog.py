@@ -39,7 +39,8 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, parent: tk.Widget, tab: str = "常规",
                  account_name: Optional[str] = None,
                  account_names: Optional[list[str]] = None,
-                 on_calibrate: Optional[Callable[[str], None]] = None):
+                 on_calibrate: Optional[Callable[[str], None]] = None,
+                 get_hwnd: Optional[Callable[[], Optional[int]]] = None):
         super().__init__(parent)
         self.title("设置")
         self.resizable(True, True)
@@ -47,6 +48,7 @@ class SettingsDialog(tk.Toplevel):
         self.transient(parent)
         self._initial_tab = tab
         self._parent = parent
+        self._get_hwnd = get_hwnd      # () -> 当前锁定的微信窗口 hwnd（校准/测试作用于它）
         self._account_name = account_name      # 当前账户（None=全局/单账户）
         self._account_names = account_names    # 可用账户列表（多账户模式）
         self._on_calibrate = on_calibrate      # (key) -> None，打开 OCR 校准
@@ -270,6 +272,10 @@ class SettingsDialog(tk.Toplevel):
             cmd = ["python", str(script), "--key", key]
             if self._account_name:
                 cmd += ["--account", self._account_name]
+            if self._get_hwnd:
+                hwnd = self._get_hwnd()
+                if hwnd:
+                    cmd += ["--hwnd", str(hwnd)]   # 校准工具作用于当前锁定的窗口
             subprocess.Popen(cmd)
 
     def _build_scroll_area(self, parent: ttk.Frame) -> tuple:
@@ -426,7 +432,10 @@ class SettingsDialog(tk.Toplevel):
             try:
                 from src.driver.wechat_bridge import WeChatBridge
                 bridge = WeChatBridge()
-                if not bridge.find_window():
+                hwnd = self._get_hwnd() if self._get_hwnd else None
+                if hwnd:
+                    bridge._hwnd = hwnd   # 测试点击作用于当前锁定的窗口
+                elif not bridge.find_window():
                     self.after(0, lambda: messagebox.showerror("错误", "未找到微信窗口"))
                     return
 
@@ -490,7 +499,8 @@ class SettingsDialog(tk.Toplevel):
             logging.getLogger(__name__).info(
                 "已保存 %s 坐标：(%.4f, %.4f)", label, x, y)
 
-        CoordPicker(self, key, label, on_save, is_cm=(key in CM_KEYS))
+        hwnd = self._get_hwnd() if self._get_hwnd else None
+        CoordPicker(self, key, label, on_save, is_cm=(key in CM_KEYS), hwnd=hwnd)
 
     def _build_update_tab(self, parent: ttk.Frame) -> None:
         """构建更新标签页"""

@@ -345,9 +345,17 @@ class MainWindow:
         acct = self._current_account_name()
         if acct:
             cmd += ["--account", acct]
+        hwnd = self._current_hwnd()
+        if hwnd:
+            cmd += ["--hwnd", str(hwnd)]   # 校准工具作用于当前锁定的窗口
         subprocess.Popen(cmd)
         self.send_progress.set_status("就绪")
-        logger.info("启动校准: key=%s account=%s", key, acct)
+        logger.info("启动校准: key=%s account=%s hwnd=%s", key, acct, hwnd)
+
+    def _current_hwnd(self) -> Optional[int]:
+        """当前锁定/选中的微信窗口句柄（单用户锁定或当前账户 bridge）"""
+        bridge = self.get_current_bridge()
+        return getattr(bridge, "_hwnd", None)
 
     def _guide_setup(self, coord_keys: list[str], calib_keys: list[str]) -> bool:
         """统一引导：坐标未配置先引导坐标，再 OCR 校准。任一取消返回 False。
@@ -679,6 +687,7 @@ class MainWindow:
             account_name=self._current_account_name(),
             account_names=names or None,
             on_calibrate=self._launch_calibrate,
+            get_hwnd=self._current_hwnd,
         )
 
     # ================================================================

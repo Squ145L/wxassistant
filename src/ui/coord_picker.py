@@ -5,7 +5,7 @@ import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
-from typing import Callable
+from typing import Callable, Optional
 
 import win32api
 from PIL import Image, ImageTk
@@ -91,6 +91,7 @@ class RecorderWindow(tk.Toplevel):
         on_save: Callable[[str, float, float], None],
         on_cancel: Callable[[], None],
         is_cm: bool = False,
+        hwnd: Optional[int] = None,
     ):
         super().__init__(parent)
         self.title(f"右键取点 - {label}")
@@ -104,6 +105,7 @@ class RecorderWindow(tk.Toplevel):
         self._on_save = on_save
         self._on_cancel = on_cancel
         self._is_cm = is_cm
+        self._hwnd = hwnd      # 当前锁定的微信窗口（None=自动找第一个）
         self._captured_x = None  # type: Optional[float]
         self._captured_y = None  # type: Optional[float]
         self._running = True
@@ -148,6 +150,8 @@ class RecorderWindow(tk.Toplevel):
         from src.driver.wechat_bridge import WeChatBridge
 
         bridge = WeChatBridge()
+        if self._hwnd:
+            bridge._hwnd = self._hwnd   # 作用于当前锁定的窗口
 
         while self._running:
             try:
@@ -158,7 +162,7 @@ class RecorderWindow(tk.Toplevel):
                     if self._is_cm:
                         rect = self._find_cm_rect(bridge)
                     else:
-                        if bridge.find_window():
+                        if bridge.hwnd is not None or bridge.find_window():
                             rect = bridge.get_window_rect()
 
                     if rect:
@@ -251,9 +255,11 @@ class CoordPicker:
         label: str,
         on_save: Callable[[str, float, float], None],
         is_cm: bool = False,
+        hwnd: Optional[int] = None,
     ):
         self._parent = parent
         self._user_on_save = on_save
+        self._hwnd = hwnd      # 当前锁定的微信窗口（None=自动找第一个）
 
         # 通讯录管理坐标：先打开通讯录管理窗口
         if is_cm:
@@ -263,7 +269,8 @@ class CoordPicker:
         self._recorder = RecorderWindow(parent, coord_key, label,
                                          on_save=self._on_save,
                                          on_cancel=self._on_cancel,
-                                         is_cm=is_cm)
+                                         is_cm=is_cm,
+                                         hwnd=hwnd)
 
         # 统一布局：缩略图在上，记录器在下，整体居中于设置窗口
         self._layout_side_by_side(parent)

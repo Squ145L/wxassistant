@@ -27,6 +27,7 @@ PROJECT_DIR = Path(__file__).resolve().parent
 CACHE_DIR = PROJECT_DIR / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 ACCOUNT = None  # --account 参数（多开时按账户保存校准）
+HWND = None     # --hwnd 参数（单用户锁定/当前账户的微信主窗口）
 
 _DESC = {"chat_title": "聊天标题栏", "search_panel": "搜索面板", "contacts_list": "通讯录列表"}
 DEFAULTS = {k: {**v, "desc": _DESC.get(k, k)} for k, v in DEFAULT_CALIBRATION.items()}
@@ -35,6 +36,10 @@ BAR_H = 60
 
 
 def find_wechat(key: str = ""):
+    # 指定了锁定窗口且有效 → 直接用它（chat_title 等主窗口类）
+    # contacts_list 的目标是「通讯录管理」弹窗，仍按标题找
+    if HWND and win32gui.IsWindow(HWND) and key != "contacts_list":
+        return HWND
     result = []
     if key == "contacts_list":
         def cb(h, _):
@@ -62,7 +67,7 @@ def save_config(key: str, params: dict) -> None:
 
 
 def main():
-    global ACCOUNT
+    global ACCOUNT, HWND
     key = "chat_title"
     for arg in sys.argv[1:]:
         if arg.startswith("--key="): key = arg.split("=", 1)[1]
@@ -71,6 +76,12 @@ def main():
         elif arg.startswith("--account="): ACCOUNT = arg.split("=", 1)[1]
         elif arg == "--account" and len(sys.argv) > sys.argv.index(arg) + 1:
             ACCOUNT = sys.argv[sys.argv.index(arg) + 1]
+        elif arg.startswith("--hwnd="):
+            try: HWND = int(arg.split("=", 1)[1])
+            except ValueError: pass
+        elif arg == "--hwnd" and len(sys.argv) > sys.argv.index(arg) + 1:
+            try: HWND = int(sys.argv[sys.argv.index(arg) + 1])
+            except ValueError: pass
 
     if key not in DEFAULTS:
         print(f"未知 key: {key}"); sys.exit(1)
