@@ -383,8 +383,9 @@ class MainWindow:
         except Exception:
             logger.exception("校准前聚焦目标窗口失败")
 
-    def _ask_calibrate(self, title: str, message: str) -> bool:
-        """自定义确认弹窗：左边「校准」右边「取消」。返回 True=点校准"""
+    def _ask_buttons(self, title: str, message: str,
+                     yes_text: str = "是", no_text: str = "否") -> bool:
+        """通用双按钮确认弹窗：左边 yes 右边 no，置顶不被微信遮挡。返回 True=左键"""
         dlg = tk.Toplevel(self.root)
         dlg.title(title)
         dlg.resizable(False, False)
@@ -395,9 +396,9 @@ class MainWindow:
         ttk.Label(dlg, text=message, justify=tk.LEFT).pack(padx=20, pady=(16, 12))
         btn = ttk.Frame(dlg)
         btn.pack(pady=(0, 14))
-        ttk.Button(btn, text="校准",
+        ttk.Button(btn, text=yes_text,
                    command=lambda: [result.__setitem__(0, True), dlg.destroy()]).pack(side=tk.LEFT)
-        ttk.Button(btn, text="取消", command=dlg.destroy).pack(side=tk.RIGHT)
+        ttk.Button(btn, text=no_text, command=dlg.destroy).pack(side=tk.LEFT, padx=(8, 0))
         dlg.update_idletasks()
         # 居中到主窗口
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
@@ -406,6 +407,43 @@ class MainWindow:
         dlg.geometry(f"+{px + (pw - w) // 2}+{py + (ph - h) // 2}")
         dlg.wait_window()
         return result[0]
+
+    def _ask_calibrate(self, title: str, message: str) -> bool:
+        """校准确认弹窗：左「校准」右「取消」。返回 True=点校准"""
+        return self._ask_buttons(title, message, "校准", "取消")
+
+    def _lock_single_wechat_window(self) -> bool:
+        """单用户模式：启动/刷新时锁定微信窗口。
+
+        只有一个微信窗口 → 直接锁定；多个 → 逐个激活窗口弹「当前窗口是否为微信？」
+        是 → 锁定并输出日志；否(下一个) → 下一个；全部否 → 兜底用第一个。
+        """
+        bridge = self._bridge
+        if bridge is None:
+            return False
+        frames = bridge.find_all_windows()
+        if not frames:
+            self.send_progress.append_log("❌ 未找到微信窗口，请先登录微信")
+            return False
+        if len(frames) == 1:
+            hwnd = frames[0][0]
+            bridge._hwnd = hwnd
+            self.send_progress.append_log(f"✅ 已连接微信窗口: 0x{hwnd:X}")
+            return True
+        # 多个窗口 → 逐个确认
+        for hwnd, title, _cls in frames:
+            if not bridge.activate_hwnd(hwnd):
+                continue
+            if self._ask_buttons("锁定微信窗口",
+                                 f"当前置顶的窗口是否为微信？\n\n标题: {title}",
+                                 "是", "否(下一个)"):
+                bridge._hwnd = hwnd
+                self.send_progress.append_log(f"✅ 已锁定微信窗口: 0x{hwnd:X}（{title}）")
+                return True
+        # 全部否 → 兜底第一个
+        bridge._hwnd = frames[0][0]
+        self.send_progress.append_log("⚠ 未确认窗口，默认使用第一个微信窗口")
+        return True
 
     def _on_account_selected(self, _event=None) -> None:
         if self._account_var:
@@ -463,8 +501,8 @@ class MainWindow:
             else:
                 self.send_progress.set_status("刷新失败 — 当前账户窗口已失效，请重新进入多开")
             return
-        if self._bridge.find_window():
-            self.send_progress.set_status("已刷新 — 重新连接微信窗口")
+        if self._lock_single_wechat_window():
+            self.send_progress.set_status("已刷新 — 已锁定微信窗口")
         else:
             self.send_progress.set_status("刷新失败 — 未找到微信窗口")
 

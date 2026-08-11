@@ -147,12 +147,13 @@ def _build_window(multi_session=None):
 
         window = MainWindow()
         bridge = WeChatBridge()
-        bridge.find_window()
         bridge.set_hook_control(
             window.suspend_interrupt_hook,
             window.resume_interrupt_hook,
         )
         window.set_bridge(bridge)
+        # 单用户模式：启动时锁定微信窗口（多窗口时逐个确认）
+        window._lock_single_wechat_window()
 
         runtime: dict[str, tuple] = {}
         for name in load_accounts():
