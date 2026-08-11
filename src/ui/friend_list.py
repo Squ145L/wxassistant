@@ -64,7 +64,7 @@ class FriendList(ttk.Frame):
         # 删除：ttk 样式统一（和反选一致）+ 红字警示
         style = ttk.Style()
         style.configure("Danger.TButton", foreground="#D32F2F")
-        ttk.Button(top, text="删除", style="Danger.TButton",
+        ttk.Button(top, text="删除", style="Danger.TButton", width=4,
                    command=self._delete_friend).pack(side=tk.LEFT, padx=2)
 
         self._label_count = ttk.Label(top, text="", foreground="gray", font=("", 9))
