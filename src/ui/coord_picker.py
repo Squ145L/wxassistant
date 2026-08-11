@@ -50,6 +50,7 @@ class ThumbnailWindow(tk.Toplevel):
         self.title(f"坐标参考 - {label}")
         self.resizable(False, False)
         self.transient(parent)
+        self.attributes('-topmost', True)   # 参考图窗口置顶，避免被微信遮挡
 
         # 提示文字
         ttk.Label(
