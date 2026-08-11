@@ -16,6 +16,7 @@ from src.utils.config import (
 )
 from src.utils.coordinates import get_coord
 from src.utils.logger import set_ui_callback
+from src.ui import ui_kit
 from src.ui.filter_bar import FilterBar
 from src.ui.friend_list import FriendList
 from src.ui.message_editor import MessageEditor
@@ -31,9 +32,9 @@ class MainWindow:
 
     def __init__(self, multi_session=None):
         self.root = tk.Tk()
-        self.root.title(WINDOW_TITLE)
-        self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        self.root.minsize(960, 580)
+        # 集中样式 + 窗口默认（minsize 防折叠、初始尺寸、居中）
+        ui_kit.configure_style(self.root)
+        ui_kit.window_defaults(self.root, WINDOW_TITLE, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
         self._friend_service = None
         self._bridge = None  # WeChatBridge，校准前用来打开对应窗口
@@ -139,7 +140,7 @@ class MainWindow:
     def _build_ui(self):
         # 顶栏（窗口级操作：账户/联系人/标签/刷新/设置/多开）
         self.top_bar = TopBar(self.root)
-        self.top_bar.pack(fill=tk.X, side=tk.TOP, padx=6, pady=(6, 0))
+        self.top_bar.pack(fill=tk.X, side=tk.TOP, padx=ui_kit.PAD_M, pady=(ui_kit.PAD_M, 0))
         self.top_bar.set_on_account_change(self._on_account_selected)
         self.top_bar.set_on_check_names(self._on_check_names_clicked)
         self.top_bar.set_on_export(self._on_export_clicked)
@@ -161,28 +162,28 @@ class MainWindow:
 
         # 底部先 pack（确保不被挤出）
         self.send_progress = SendProgress(self.root)
-        self.send_progress.pack(fill=tk.X, side=tk.BOTTOM, padx=6, pady=(0, 6))
+        self.send_progress.pack(fill=tk.X, side=tk.BOTTOM, padx=ui_kit.PAD_M, pady=(0, ui_kit.PAD_M))
 
-        # 主区域
-        # 用经典 tk.PanedWindow（支持 pane minsize，限制联系人面板最小宽度）
-        main_paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
-        main_paned.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6, 0))
+        # 主区域：块分区（浅色背景块，无分割线）
+        # 经典 tk.PanedWindow（支持 pane minsize；无 sashrelief = 无分割线）
+        main_paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        main_paned.pack(fill=tk.BOTH, expand=True, padx=ui_kit.PAD_M, pady=(ui_kit.PAD_M, 0))
 
-        left = ttk.Frame(main_paned, width=LEFT_PANEL_WIDTH)
-        main_paned.add(left, minsize=LEFT_MIN_PANEL_WIDTH)
+        left = ui_kit.make_block(main_paned, width=LEFT_PANEL_WIDTH)
+        main_paned.add(left, minsize=LEFT_MIN_PANEL_WIDTH)   # 380 ≥ 操作行固定控件总宽
 
         self.filter_bar = FilterBar(left)
-        self.filter_bar.pack(fill=tk.X)
+        self.filter_bar.pack(fill=tk.X, padx=ui_kit.PAD_M, pady=(ui_kit.PAD_M, 0))
         self.filter_bar.set_on_tag_filter(self._on_tag_filter_changed)
 
         self.friend_list = FriendList(left)
-        self.friend_list.pack(fill=tk.BOTH, expand=True)
+        self.friend_list.pack(fill=tk.BOTH, expand=True, padx=ui_kit.PAD_M, pady=ui_kit.PAD_M)
 
-        right = ttk.Frame(main_paned)
-        main_paned.add(right, minsize=360)
+        right = ui_kit.make_block(main_paned)
+        main_paned.add(right, minsize=260)   # 编辑区可读下限
 
         self.message_editor = MessageEditor(right)
-        self.message_editor.pack(fill=tk.BOTH, expand=True)
+        self.message_editor.pack(fill=tk.BOTH, expand=True, padx=ui_kit.PAD_M, pady=ui_kit.PAD_M)
 
     def _wire_events(self):
         self.filter_bar.bind("<<FilterChanged>>", lambda _e: self._apply_filter())

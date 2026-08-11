@@ -10,6 +10,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Optional
 
+from src.ui import ui_kit
+
 
 class TopBar(ttk.Frame):
     """主窗口顶栏"""
@@ -92,18 +94,18 @@ class TopBar(ttk.Frame):
         self._btn_account_mgr = ttk.Button(self, text="账户管理", width=6,
                                            command=self._make_cmd("_on_account_manager"))
 
-        # pack 顺序：右侧按钮从右往左
-        self._btn_multiopen.pack(side=tk.RIGHT, padx=(4, 2))
-        self._btn_settings.pack(side=tk.RIGHT, padx=4)
-        self._btn_help.pack(side=tk.RIGHT, padx=4)
-        self._btn_refresh.pack(side=tk.RIGHT, padx=4)
-        # 左侧：联系人 / 账户管理 / 标签
-        self._btn_tags.pack(side=tk.LEFT, padx=(8, 0))
-        self._btn_account_mgr.pack(side=tk.LEFT, padx=(8, 0))
-        self._btn_contacts.pack(side=tk.LEFT, padx=(8, 0))
-        # 账户（始终显示：账户: [combo]，单/多模式都有账户可切）
-        self._account_label.pack(side=tk.LEFT)
-        self._account_combo.pack(side=tk.LEFT, padx=(0, 2))
+        # 布局：左侧分组菜单 → 账户 → 多开/账户管理 → 弹性区 → 右侧 帮助/设置/刷新
+        # （弹性区吸收多余空间，固定控件永不互相挤压折叠 —— 布局铁律 1）
+        self._btn_contacts.pack(side=tk.LEFT)
+        self._btn_tags.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        self._account_label.pack(side=tk.LEFT, padx=(ui_kit.PAD_M, 0))
+        self._account_combo.pack(side=tk.LEFT, padx=(0, ui_kit.PAD_S))
+        self._btn_multiopen.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        self._btn_account_mgr.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        ui_kit.Spacer(self).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._btn_help.pack(side=tk.RIGHT)
+        self._btn_settings.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
+        self._btn_refresh.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
         self.set_account_options(None)
 
     # ================================================================
