@@ -34,6 +34,8 @@ class FriendList(ttk.Frame):
         self._on_set_tag: Optional[Callable[[str, str], bool]] = None
         self._on_search_contacts: Optional[Callable[[], None]] = None
         self._on_import_all: Optional[Callable[[], None]] = None
+        self._on_batch_tag: Optional[Callable[[], None]] = None
+        self._on_clear_tags: Optional[Callable[[], None]] = None
 
         self._rename_entry = None
         self._rename_iid = None
@@ -49,6 +51,30 @@ class FriendList(ttk.Frame):
         self._on_set_tag = on_set_tag
         self._on_search_contacts = on_search
         self._on_import_all = on_import
+
+    def set_on_batch_tag(self, cb: Callable[[], None]) -> None:
+        self._on_batch_tag = cb
+
+    def set_on_clear_tags(self, cb: Callable[[], None]) -> None:
+        self._on_clear_tags = cb
+
+    def _on_batch_tag_clicked(self) -> None:
+        """标签▾ → 添加标签（委托 MainWindow）"""
+        if self._on_batch_tag:
+            self._on_batch_tag()
+
+    def _on_clear_tags_clicked(self) -> None:
+        """标签▾ → 清除标签（委托 MainWindow）"""
+        if self._on_clear_tags:
+            self._on_clear_tags()
+
+    def _toggle_menu(self, btn: ttk.Menubutton, menu: tk.Menu) -> str:
+        """标签▾ 点击：tk_popup 阻塞式（再点/点别处即收起）"""
+        try:
+            menu.tk_popup(btn.winfo_rootx(), btn.winfo_rooty() + btn.winfo_height())
+        finally:
+            menu.grab_release()
+        return "break"
 
     # ================================================================
     # UI 构建
@@ -79,27 +105,36 @@ class FriendList(ttk.Frame):
                                       foreground="gray", font=("", 9))
         self._match_label.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
 
-        # ---- 操作行（搜索框下面一行）：➕/删除 (Spacer) 已选x/y 全选 反选 ----
+        # ---- 操作行（搜索框下面一行）：全选 反选 标签▾ (Spacer) 已选x/y ➕ 删除 ----
         actions = ttk.Frame(self)
         actions.pack(fill=tk.X, padx=ui_kit.PAD_S, pady=(ui_kit.PAD_S, 0))
-        self._btn_add = ttk.Button(actions, text="➕", width=3, command=self._pop_add_menu)
-        self._btn_add.pack(side=tk.LEFT)
-        self._add_menu = tk.Menu(self, tearoff=0)
-        self._add_menu.add_command(label="手动添加", command=self._add_friend)
-        self._add_menu.add_command(label="搜索并导入", command=self._on_search_menu)
-        self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
-        # 删除：默认按钮外观 + 红字（ui_kit Danger.TButton 只染文字色）
-        ttk.Button(actions, text="删除", style="Danger.TButton", width=4,
-                   command=self._delete_friend).pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
-        ui_kit.Spacer(actions).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._label_count = ttk.Label(actions, text="", foreground="gray", font=("", 9))
-        self._label_count.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
         self._cb_select_all = ttk.Checkbutton(
             actions, text="全选", variable=self._select_all_var,
             command=self._on_select_all_toggle,
         )
-        self._cb_select_all.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
-        ttk.Button(actions, text="反选", width=4, command=self.invert_selection).pack(side=tk.RIGHT)
+        self._cb_select_all.pack(side=tk.LEFT)
+        ttk.Button(actions, text="反选", width=4, command=self.invert_selection).pack(
+            side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        # 标签▾ 菜单（添加/清除标签，从顶栏下沉）
+        self._btn_tags = ttk.Menubutton(actions, text="标签")
+        tags_menu = tk.Menu(self._btn_tags, tearoff=0)
+        tags_menu.add_command(label="添加标签", command=self._on_batch_tag_clicked)
+        tags_menu.add_command(label="清除标签", command=self._on_clear_tags_clicked)
+        self._btn_tags["menu"] = tags_menu
+        self._btn_tags.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        self._btn_tags.bind("<Button-1>", lambda e: self._toggle_menu(self._btn_tags, tags_menu))
+        ui_kit.Spacer(actions).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # 右侧（从右往左 pack）：删除 ➕ 已选x/y
+        ttk.Button(actions, text="删除", style="Danger.TButton", width=4,
+                   command=self._delete_friend).pack(side=tk.RIGHT)
+        self._btn_add = ttk.Button(actions, text="➕", width=3, command=self._pop_add_menu)
+        self._btn_add.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
+        self._label_count = ttk.Label(actions, text="", foreground="gray", font=("", 9))
+        self._label_count.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+        self._add_menu = tk.Menu(self, tearoff=0)
+        self._add_menu.add_command(label="手动添加", command=self._add_friend)
+        self._add_menu.add_command(label="搜索并导入", command=self._on_search_menu)
+        self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
 
         ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(ui_kit.PAD_S, 0))
 

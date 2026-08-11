@@ -146,8 +146,6 @@ class MainWindow:
         self.top_bar.set_on_export(self._on_export_clicked)
         self.top_bar.set_on_import_all(self._on_import_all_clicked)
         self.top_bar.set_on_search_import(self._on_search_contacts_clicked)
-        self.top_bar.set_on_batch_tag(self._on_batch_tag_clicked)
-        self.top_bar.set_on_clear_tags(self._on_clear_tags_clicked)
         self.top_bar.set_on_refresh(self._on_refresh)
         self.top_bar.set_on_settings(self._open_settings)
         self.top_bar.set_on_help(self._on_help_clicked)
@@ -176,6 +174,8 @@ class MainWindow:
         self.friend_list = FriendList(left)
         self.friend_list.pack(fill=tk.BOTH, expand=True, padx=ui_kit.PAD_M, pady=ui_kit.PAD_M)
         self.friend_list.set_on_tag_filter(self._on_tag_filter_changed)
+        self.friend_list.set_on_batch_tag(self._on_batch_tag_clicked)
+        self.friend_list.set_on_clear_tags(self._on_clear_tags_clicked)
 
         right = ui_kit.make_block(main_paned)
         main_paned.add(right, minsize=260)   # 编辑区可读下限

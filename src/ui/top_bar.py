@@ -23,8 +23,6 @@ class TopBar(ttk.Frame):
         self._on_export: Optional[Callable[[str], None]] = None   # fmt: txt/csv/json
         self._on_import_all: Optional[Callable[[], None]] = None
         self._on_search_import: Optional[Callable[[], None]] = None
-        self._on_batch_tag: Optional[Callable[[], None]] = None
-        self._on_clear_tags: Optional[Callable[[], None]] = None
         self._on_refresh: Optional[Callable[[], None]] = None
         self._on_settings: Optional[Callable[[], None]] = None
         self._on_help: Optional[Callable[[], None]] = None
@@ -73,18 +71,10 @@ class TopBar(ttk.Frame):
         contacts_menu.add_command(label="搜索并导入", command=self._make_cmd("_on_search_import"))
         self._btn_contacts["menu"] = contacts_menu
 
-        # ---- 标签菜单 ----
-        self._btn_tags = ttk.Menubutton(self, text="标签")
-        tags_menu = tk.Menu(self._btn_tags, tearoff=0)
-        tags_menu.add_command(label="添加标签", command=self._make_cmd("_on_batch_tag"))
-        tags_menu.add_command(label="清除标签", command=self._make_cmd("_on_clear_tags"))
-        self._btn_tags["menu"] = tags_menu
-
         # toggle：点开/再点或点别处收起（tk_popup 阻塞式，天然满足）
+        # 标签▾ 已下沉到好友列表操作行（添加/清除标签）
         self._btn_contacts.bind(
             "<Button-1>", lambda e: self._toggle_menu(self._btn_contacts, contacts_menu))
-        self._btn_tags.bind(
-            "<Button-1>", lambda e: self._toggle_menu(self._btn_tags, tags_menu))
 
         # ---- 右侧按钮 ----
         self._btn_refresh = ttk.Button(self, text="刷新", width=4, command=self._make_cmd("_on_refresh"))
@@ -97,7 +87,6 @@ class TopBar(ttk.Frame):
         # 布局：左侧分组菜单 → 账户 → 多开/账户管理 → 弹性区 → 右侧 帮助/设置/刷新
         # （弹性区吸收多余空间，固定控件永不互相挤压折叠 —— 布局铁律 1）
         self._btn_contacts.pack(side=tk.LEFT)
-        self._btn_tags.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         self._account_label.pack(side=tk.LEFT, padx=(ui_kit.PAD_M, 0))
         self._account_combo.pack(side=tk.LEFT, padx=(0, ui_kit.PAD_S))
         self._btn_multiopen.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
@@ -162,7 +151,6 @@ class TopBar(ttk.Frame):
         self._btn_help.config(state=state)
         self._btn_multiopen.config(state=state)
         self._btn_contacts.config(state=state)
-        self._btn_tags.config(state=state)
         self._btn_account_mgr.config(state=state)
         self.set_account_enabled(enabled)
 
@@ -181,10 +169,9 @@ class TopBar(ttk.Frame):
     def set_on_export(self, cb): self._on_export = cb
     def set_on_import_all(self, cb): self._on_import_all = cb
     def set_on_search_import(self, cb): self._on_search_import = cb
-    def set_on_batch_tag(self, cb): self._on_batch_tag = cb
-    def set_on_clear_tags(self, cb): self._on_clear_tags = cb
     def set_on_refresh(self, cb): self._on_refresh = cb
     def set_on_settings(self, cb): self._on_settings = cb
     def set_on_help(self, cb): self._on_help = cb
     def set_on_multiopen(self, cb): self._on_multiopen = cb
     def set_on_account_manager(self, cb): self._on_account_manager = cb
+
