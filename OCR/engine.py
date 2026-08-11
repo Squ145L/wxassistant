@@ -5,6 +5,7 @@
 
 import json
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -22,48 +23,69 @@ OCR_CACHE_TTL = 30                # 同搜索词缓存秒数
 OCR_MODEL_DIR = Path(__file__).parent / "models"  # 本地模型目录
 OCR_CONFUSION_PATH = Path(__file__).parent / "ocr_confusion.json"  # 字符混淆映射
 
-# RapidOCR 全局单例（惰性加载）
+# RapidOCR 全局单例（惰性加载，线程安全）
 _ocr_instance: Optional[object] = None
+_ocr_lock = threading.Lock()
 
 
 def _get_ocr():
-    """惰性初始化 RapidOCR，全局复用"""
+    """惰性初始化 RapidOCR，全局复用（双检锁线程安全）
+
+    预热线程与操作线程可能并发调用，用锁保证只加载一次。
+    """
     global _ocr_instance
-    if _ocr_instance is None:
-        logger.info("正在加载 RapidOCR 模型...")
-        from rapidocr_onnxruntime import RapidOCR
+    if _ocr_instance is not None:
+        return _ocr_instance
+    with _ocr_lock:
+        if _ocr_instance is None:
+            logger.info("正在加载 RapidOCR 模型...")
+            from rapidocr_onnxruntime import RapidOCR
 
-        # 扫描本地模型和字典
-        det_model = None
-        rec_model = None
-        dict_file = None
-        if OCR_MODEL_DIR.exists():
-            for f in OCR_MODEL_DIR.iterdir():
-                name = f.name.lower()
-                if "det" in name and name.endswith(".onnx"):
-                    det_model = str(f)
-                elif "rec" in name and name.endswith(".onnx"):
-                    rec_model = str(f)
-                elif name.endswith(".txt"):
-                    dict_file = str(f)
-                    logger.info("找到字典文件: %s", f.name)
+            # 扫描本地模型和字典
+            det_model = None
+            rec_model = None
+            dict_file = None
+            if OCR_MODEL_DIR.exists():
+                for f in OCR_MODEL_DIR.iterdir():
+                    name = f.name.lower()
+                    if "det" in name and name.endswith(".onnx"):
+                        det_model = str(f)
+                    elif "rec" in name and name.endswith(".onnx"):
+                        rec_model = str(f)
+                    elif name.endswith(".txt"):
+                        dict_file = str(f)
+                        logger.info("找到字典文件: %s", f.name)
 
-        if det_model and rec_model:
-            logger.info("使用本地模型: %s", OCR_MODEL_DIR)
-            _ocr_instance = RapidOCR(
-                det_model_path=det_model,
-                rec_model_path=rec_model,
-                dict_path=dict_file,
-            )
-        elif dict_file:
-            # 有字典但没有本地模型 → 用默认模型+本地字典
-            logger.info("使用默认模型 + 本地字典")
-            _ocr_instance = RapidOCR(dict_path=dict_file)
-        else:
-            logger.info("使用默认模型（无本地字典）")
-            _ocr_instance = RapidOCR()
-        logger.info("RapidOCR 初始化完成")
+            if det_model and rec_model:
+                logger.info("使用本地模型: %s", OCR_MODEL_DIR)
+                _ocr_instance = RapidOCR(
+                    det_model_path=det_model,
+                    rec_model_path=rec_model,
+                    dict_path=dict_file,
+                )
+            elif dict_file:
+                # 有字典但没有本地模型 → 用默认模型+本地字典
+                logger.info("使用默认模型 + 本地字典")
+                _ocr_instance = RapidOCR(dict_path=dict_file)
+            else:
+                logger.info("使用默认模型（无本地字典）")
+                _ocr_instance = RapidOCR()
+            logger.info("RapidOCR 初始化完成")
     return _ocr_instance
+
+
+def warmup_ocr() -> None:
+    """后台预热 OCR 模型（main.py 启动时 daemon 线程调用）
+
+    首次模型加载约需 1-2 分钟；若发生在检查/发送操作内会阻塞且期间无法中断。
+    启动即后台加载，操作时模型已就绪。日志走 logger，会自动进发送日志面板。
+    """
+    logger.info("OCR 模型后台预热中（首次加载约需 1-2 分钟，期间可正常使用）...")
+    try:
+        _get_ocr()
+        logger.info("OCR 模型已预热完成，检查/发送无需等待加载")
+    except Exception:
+        logger.warning("OCR 模型预热失败，将在首次使用时再加载", exc_info=True)
 
 
 # ================================================================
