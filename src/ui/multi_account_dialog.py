@@ -7,16 +7,11 @@
 3. 列表支持重命名/删除
 4. [确定并进入多开] 返回 MultiAccountSession；[取消] 返回 None
 """
-import logging
-import time
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from typing import Optional
+from typing import Any, Optional
 
-from src.driver.wechat_bridge import WeChatBridge
 from src.services.multi_account import MultiAccountSession
-
-logger = logging.getLogger(__name__)
 
 
 def _default_name(index: int) -> str:
@@ -26,7 +21,7 @@ def _default_name(index: int) -> str:
 class MultiOpenWizard:
     """多开引导（模态）"""
 
-    def __init__(self, root: tk.Tk, bridge: WeChatBridge):
+    def __init__(self, root: tk.Tk, bridge: Any):
         self.root = root
         self.bridge = bridge
         self.result: Optional[MultiAccountSession] = None
@@ -91,6 +86,10 @@ class MultiOpenWizard:
         if not frames:
             messagebox.showwarning("提示", "未找到微信窗口，请先登录微信。")
             return
+        if self._session.accounts:
+            if not messagebox.askyesno("重新检测", "重新检测将清空已绑定的账户，是否继续？"):
+                return
+            self._session = MultiAccountSession()
         self._frames = frames
         self._lbl_count.config(text=f"检测到 {len(frames)} 个微信窗口")
         self._refresh_tree()
@@ -103,42 +102,31 @@ class MultiOpenWizard:
         start = len(self._session.accounts)
         for i in range(start, len(self._frames)):
             hwnd, title, _cls = self._frames[i]
-            if not self._bring_to_front(hwnd):
-                messagebox.showwarning("提示", f"无法激活窗口 0x{hwnd:X}，跳过。")
+            if not self.bridge.activate_hwnd(hwnd):
+                messagebox.showwarning("提示", f"无法激活窗口 0x{hwnd:X}（可能被前台锁定），跳过。")
                 continue
             name = simpledialog.askstring(
                 "确认账户",
                 f"窗口 {i + 1}/{len(self._frames)}\n当前显示在最前的微信窗口是哪个账户？\n\n标题: {title}",
-                initialvalue=_default_name(i),
+                initialvalue=self._next_available_default(_default_name(i)),
                 parent=self.root,
             )
             if name is None:
                 break  # 用户点了取消 → 停止逐个确认，保留已确认的
-            name = name.strip() or _default_name(i)
-            self._session.add(name=name, hwnd=hwnd)
+            name = name.strip() or self._next_available_default(_default_name(i))
+            if not self._session.add(name=name, hwnd=hwnd):
+                messagebox.showwarning(
+                    "提示", f"账户名 '{name}' 与已有账户冲突（或窗口已绑定），跳过。")
         self._refresh_tree()
 
-    def _bring_to_front(self, hwnd: int) -> bool:
-        """把微信窗口置顶激活（复用 activate_window 的 Alt 技巧）"""
-        import win32api
-        import win32con
-        import win32gui
-        try:
-            if win32gui.IsIconic(hwnd):
-                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                time.sleep(0.2)
-            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
-                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
-            win32gui.SetForegroundWindow(hwnd)
-            win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
-            time.sleep(0.3)
-            return True
-        except Exception:
-            logger.exception("激活窗口失败: 0x%X", hwnd)
-            return False
+    def _next_available_default(self, base: str) -> str:
+        """返回未占用的默认名（默认名撞已有账户时自动加 _2/_3…）"""
+        name = base
+        n = 2
+        while any(a.name == name for a in self._session.accounts):
+            name = f"{base}_{n}"
+            n += 1
+        return name
 
     # ---- 列表操作 ----
     def _refresh_tree(self):
@@ -184,7 +172,7 @@ class MultiOpenWizard:
         self.root.destroy()
 
 
-def run_multiopen_wizard(bridge: WeChatBridge) -> Optional[MultiAccountSession]:
+def run_multiopen_wizard(bridge: Any) -> Optional[MultiAccountSession]:
     """打开多开引导，返回会话（取消返回 None）"""
     root = tk.Tk()
     wizard = MultiOpenWizard(root, bridge)

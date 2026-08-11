@@ -202,6 +202,39 @@ class WeChatBridge:
         finally:
             if self._hook_resume: self._hook_resume()
 
+    def activate_hwnd(self, hwnd: int, retries: int = 3) -> bool:
+        """激活任意微信窗口（多开引导用），校验前台激活成功
+
+        Windows 前台锁定可能拒绝 SetForegroundWindow；只有确认
+        GetForegroundWindow 已是目标窗口才返回 True，避免确认错账户。
+        """
+        try:
+            if win32gui.IsIconic(hwnd):
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                time.sleep(0.2)
+            for _ in range(retries):
+                if self._hook_suspend:
+                    self._hook_suspend()
+                try:
+                    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+                                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+                    win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
+                                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+                    win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
+                    win32gui.SetForegroundWindow(hwnd)
+                    win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
+                    time.sleep(0.15)
+                    if win32gui.GetForegroundWindow() == hwnd:
+                        return True
+                finally:
+                    if self._hook_resume:
+                        self._hook_resume()
+            logger.warning("窗口激活失败（可能被前台锁定）: 0x%X", hwnd)
+            return False
+        except Exception:
+            logger.exception("激活窗口失败: 0x%X", hwnd)
+            return False
+
     # ================================================================
     # 键盘模拟 — UIA SendKeys（线程安全，每次创建 UIA 控件）
     # ================================================================
