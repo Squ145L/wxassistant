@@ -117,36 +117,33 @@ class SettingsDialog(tk.Toplevel):
         # ---- 标签2: OCR ----
         tab2 = ttk.Frame(nb, padding=16)
         nb.add(tab2, text="OCR")
+        _ocr_canvas, _ocr_sb, ocr_body, _bind_ocr_wheel = self._build_scroll_area(tab2)
 
-        ttk.Label(tab2, text="调试选项:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Checkbutton(tab2, text="保存调试截图 (cache/debug_scan/)", variable=self._ocr_debug).pack(anchor=tk.W)
+        # OCR 校准按钮置顶
+        ttk.Button(ocr_body, text="校准聊天界面标题",
+                   command=lambda: self._calibrate("chat_title")).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Button(ocr_body, text="校准通讯录区域",
+                   command=lambda: self._calibrate("contacts_list")).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Button(ocr_body, text="OCR 校准重置",
+                   command=self._reset_ocr).pack(anchor=tk.W, pady=(0, 10))
 
-        ttk.Separator(tab2, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+        ttk.Separator(ocr_body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
 
-        ttk.Label(tab2, text="扫描通讯录并导入:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Label(ocr_body, text="调试选项:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Checkbutton(ocr_body, text="保存调试截图 (cache/debug_scan/)", variable=self._ocr_debug).pack(anchor=tk.W)
 
-        ttk.Label(tab2, text="截图页数:").pack(anchor=tk.W)
-        ttk.Spinbox(tab2, from_=1, to=50, textvariable=self._page_count, width=8).pack(anchor=tk.W, pady=(2, 8))
+        ttk.Separator(ocr_body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
 
-        ttk.Label(tab2, text="每页滚动高度 (px):").pack(anchor=tk.W)
-        ttk.Entry(tab2, textvariable=self._scroll_px, width=10).pack(anchor=tk.W, pady=(2, 6))
-
-        ttk.Label(tab2, text="每次翻的页数:").pack(anchor=tk.W)
+        ttk.Label(ocr_body, text="扫描通讯录并导入:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Label(ocr_body, text="截图页数:").pack(anchor=tk.W)
+        ttk.Spinbox(ocr_body, from_=1, to=50, textvariable=self._page_count, width=8).pack(anchor=tk.W, pady=(2, 8))
+        ttk.Label(ocr_body, text="每页滚动高度 (px):").pack(anchor=tk.W)
+        ttk.Entry(ocr_body, textvariable=self._scroll_px, width=10).pack(anchor=tk.W, pady=(2, 6))
+        ttk.Label(ocr_body, text="每次翻的页数:").pack(anchor=tk.W)
         self._pages_per = tk.IntVar(value=self._settings.get("scan_pages_per_scroll", 1))
-        ttk.Spinbox(tab2, from_=1, to=10, textvariable=self._pages_per, width=8).pack(anchor=tk.W, pady=(2, 10))
+        ttk.Spinbox(ocr_body, from_=1, to=10, textvariable=self._pages_per, width=8).pack(anchor=tk.W, pady=(2, 10))
 
-        ttk.Button(tab2, text="测试：通讯录 → 通讯录管理 → 滚一页",
-                   command=self._run_test).pack(pady=(0, 4))
-
-        ttk.Separator(tab2, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
-
-        ttk.Button(tab2, text="校准聊天界面标题",
-                   command=lambda: self._calibrate("chat_title")).pack(pady=(0, 4))
-        ttk.Button(tab2, text="校准通讯录区域",
-                   command=lambda: self._calibrate("contacts_list")).pack(pady=(0, 8))
-
-        ttk.Button(tab2, text="OCR 校准重置",
-                   command=self._reset_ocr).pack(pady=(0, 8))
+        _bind_ocr_wheel(ocr_body)
 
         # ---- 标签3: 坐标 ----
         tab3 = ttk.Frame(nb, padding=16)
@@ -196,7 +193,8 @@ class SettingsDialog(tk.Toplevel):
 
         # ---- 底部 ----
         btn_frame = ttk.Frame(self, padding=12)
-        btn_frame.pack(fill=tk.X)
+        # side=BOTTOM：窗口较小时 [关闭] 始终贴底可见，不被 notebook 内容挤出
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM)
         ttk.Button(btn_frame, text="关闭", command=self._on_close).pack(side=tk.RIGHT)
 
     def _on_close(self) -> None:
@@ -246,39 +244,6 @@ class SettingsDialog(tk.Toplevel):
                 pass
         messagebox.showinfo("已清除", "日志和扫描截图已清空。")
 
-    def _run_test(self) -> None:
-        def _do():
-            try:
-                from src.driver.wechat_bridge import WeChatBridge
-                bridge = WeChatBridge()
-                if not bridge.find_window():
-                    self.after(0, lambda: messagebox.showerror("错误", "未找到微信窗口"))
-                    return
-
-                hwnd = bridge.open_contacts_manager()
-                if hwnd is None:
-                    self.after(0, lambda: messagebox.showerror("错误", "未找到通讯录管理窗口"))
-                    return
-
-                import win32gui
-                from src.utils.coordinates import get_coord
-                rect = win32gui.GetWindowRect(hwnd)
-                if rect:
-                    cx_pct, cy_pct = get_coord("cm_list_focus", self._account_name)
-                    fx = rect[0] + int((rect[2] - rect[0]) * cx_pct)
-                    fy = rect[1] + int((rect[3] - rect[1]) * cy_pct)
-                    bridge.click_at(fx, fy)
-                    time.sleep(0.15)
-                    bridge.scroll_at(fx, fy, -self._scroll_px.get())
-                    time.sleep(1.5)
-
-                self.after(0, lambda: [self.lift(), self.focus_force()])
-
-            except Exception as e:
-                self.after(0, lambda: messagebox.showerror("测试失败", str(e)))
-
-        threading.Thread(target=_do, daemon=True).start()
-
     def _reset_ocr(self) -> None:
         if not messagebox.askyesno("OCR 校准重置", "确认清除所有 OCR 校准参数？"):
             return
@@ -296,6 +261,32 @@ class SettingsDialog(tk.Toplevel):
             if self._account_name:
                 cmd += ["--account", self._account_name]
             subprocess.Popen(cmd)
+
+    def _build_scroll_area(self, parent: ttk.Frame) -> tuple:
+        """构建可滚动内容区（OCR/坐标共用）
+
+        Returns: (canvas, scrollbar, scroll_frame, bind_mousewheel)
+        """
+        canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
+        scroll_frame = ttk.Frame(canvas)
+        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        cw = canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW)
+        # scroll_frame 宽度跟随 canvas，防止右边内容被截断
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(cw, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _bind_mousewheel(widget):
+            widget.bind("<MouseWheel>", _on_mousewheel)
+            for child in widget.winfo_children():
+                _bind_mousewheel(child)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        return canvas, scrollbar, scroll_frame, _bind_mousewheel
 
     def _build_coord_tab(self, parent: ttk.Frame) -> None:
         """构建坐标标签页：每个坐标一行 X% + Y% spinbox"""
@@ -315,24 +306,7 @@ class SettingsDialog(tk.Toplevel):
         self._coord_loaded = coords
 
         # 滚动区（坐标多时避免溢出）
-        canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
-        scroll_frame = ttk.Frame(canvas)
-
-        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        cw = canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW)
-        # scroll_frame 宽度跟随 canvas，防止右边内容被截断
-        canvas.bind("<Configure>", lambda e: canvas.itemconfig(cw, width=e.width))
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # 滚轮事件（函数定义，绑定移到控件创建完成后）
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        def _bind_mousewheel(widget):
-            widget.bind("<MouseWheel>", _on_mousewheel)
-            for child in widget.winfo_children():
-                _bind_mousewheel(child)
+        _canvas, _scrollbar, scroll_frame, _bind_mousewheel = self._build_scroll_area(parent)
 
         pct_vcmd = (parent.register(_validate_pct), "%P")
 
@@ -390,9 +364,6 @@ class SettingsDialog(tk.Toplevel):
 
         # 所有控件创建完毕，绑定滚轮事件
         _bind_mousewheel(scroll_frame)
-
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _save_coordinates(self) -> None:
         """收集坐标输入框的值并保存

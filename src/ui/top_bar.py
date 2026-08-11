@@ -78,6 +78,12 @@ class TopBar(ttk.Frame):
         tags_menu.add_command(label="清除标签", command=self._make_cmd("_on_clear_tags"))
         self._btn_tags["menu"] = tags_menu
 
+        # toggle：点开/再点或点别处收起（tk_popup 阻塞式，天然满足）
+        self._btn_contacts.bind(
+            "<Button-1>", lambda e: self._toggle_menu(self._btn_contacts, contacts_menu))
+        self._btn_tags.bind(
+            "<Button-1>", lambda e: self._toggle_menu(self._btn_tags, tags_menu))
+
         # ---- 右侧按钮 ----
         self._btn_refresh = ttk.Button(self, text="刷新", width=4, command=self._make_cmd("_on_refresh"))
         self._btn_settings = ttk.Button(self, text="设置", width=4, command=self._make_cmd("_on_settings"))
@@ -129,6 +135,18 @@ class TopBar(ttk.Frame):
     def _on_combo_selected(self, _event=None) -> None:
         if self._on_account_change:
             self._on_account_change(self._account_combo.get())
+
+    def _toggle_menu(self, btn: ttk.Menubutton, menu: tk.Menu) -> str:
+        """[联系人]/[标签] 点击：弹出菜单（tk_popup 阻塞式）
+
+        tk_popup 带 grab：再点按钮或点菜单外任意处即收起并返回。
+        返回 "break" 阻止 Menubutton 默认行为，避免二次弹出。
+        """
+        try:
+            menu.tk_popup(btn.winfo_rootx(), btn.winfo_rooty() + btn.winfo_height())
+        finally:
+            menu.grab_release()
+        return "break"
 
     def set_multiopen_label(self, is_multi: bool) -> None:
         """多开模式下按钮显示 [单用户模式]，单账户显示 [多开]"""

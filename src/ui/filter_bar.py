@@ -39,11 +39,13 @@ class FilterBar(ttk.Frame):
             row, textvariable=self._match_label_var, foreground="gray", font=("", 9))
         self._label_match.pack(side=tk.RIGHT, padx=(0, 6))
 
-        ttk.Label(row, text="标签:", font=("", 9)).pack(side=tk.RIGHT, padx=(0, 2))
         self._tag_var = tk.StringVar(value="全部")
         self._tag_combo = ttk.Combobox(
             row, textvariable=self._tag_var, values=["全部"], state="readonly", width=8)
+        # 先 pack combo → 更靠右；后 pack label → 在其左边，显示为 标签:[全部]
         self._tag_combo.pack(side=tk.RIGHT, padx=(0, 4))
+        self._lbl_tag = ttk.Label(row, text="标签:", font=("", 9))
+        self._lbl_tag.pack(side=tk.RIGHT, padx=(0, 2))
         self._tag_combo.bind("<<ComboboxSelected>>", self._on_tag_selected)
 
         self._regex_hint = ttk.Label(row, text="", foreground="#2196F3", font=("", 8))
