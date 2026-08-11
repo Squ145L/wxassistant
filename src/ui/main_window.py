@@ -123,6 +123,8 @@ class MainWindow:
         self.set_bridge(bridge)
         self.set_friend_service(service)
         self.friend_list.select_none()
+        # 清空上一条账户残留的搜索/正则/标签筛选，再刷新到当前账户全量列表
+        self.filter_bar.clear_filter()
 
     # ================================================================
     # UI 构建

@@ -97,6 +97,16 @@ class FilterBar(ttk.Frame):
         self._entry.config(state=state)
         self._cb_regex.config(state=state)
 
+    def clear_filter(self) -> None:
+        """清空筛选文字 + 正则模式 + 标签筛选（账户切换时调用，防串账户）"""
+        # 注意顺序：_tag_var 无 trace，须先重置为「全部」；
+        # 否则下方 _filter_var.set("") 触发的刷新会读到旧标签，跨账户残留。
+        self._tag_var.set("全部")
+        self._regex_mode.set(False)
+        self._filter_var.set("")
+        self.set_regex_error("")
+        self.set_regex_hint("")
+
     # ================================================================
     # 内部
     # ================================================================
