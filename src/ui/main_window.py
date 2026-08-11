@@ -1,6 +1,5 @@
 """主窗口：布局组装 + 组件联动 + 后台发送线程管理"""
 
-import json
 import logging
 import queue
 import subprocess
@@ -11,6 +10,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Optional, Callable
 
+from src.utils.calibration import calibration_has_key
 from src.utils.config import (
     WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, LEFT_PANEL_WIDTH, LEFT_MIN_PANEL_WIDTH,
 )
@@ -342,14 +342,9 @@ class MainWindow:
         logger.info("启动校准: key=%s account=%s", key, acct)
 
     def _ensure_calibration(self, key: str) -> bool:
-        config_path = Path("cache/ocr_calibration.json")
-        if config_path.exists():
-            try:
-                data = json.loads(config_path.read_text(encoding="utf-8"))
-                if key in data:
-                    return True
-            except Exception:
-                pass
+        """发送/扫描前检查校准（账户感知：账户专属或继承全局都算已校准）"""
+        if calibration_has_key(key, self._current_account_name()):
+            return True
         if messagebox.askyesno("未校准", f"尚未校准 [{key}] 区域，现在打开校准工具？"):
             self._launch_calibrate(key)
         return False
@@ -582,25 +577,9 @@ class MainWindow:
             "建议平铺窗口后重新进入多开。\n是否仍然继续？",
         )
 
-    def _current_calibration_path(self) -> Path:
-        """当前账户（或全局）的 OCR 校准文件路径"""
-        acct = self._current_account_name()
-        if acct:
-            from src.utils.account_paths import calibration_path_for
-            return calibration_path_for(acct)
-        return Path("cache/ocr_calibration.json")
-
     def _check_calibration(self) -> bool:
         """发送前检查是否做过聊天标题校准，未校准则提示。返回 True=可继续"""
-        path = self._current_calibration_path()
-        calibrated = False
-        if path.exists():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                calibrated = bool(data.get("chat_title"))
-            except Exception:
-                pass
-        if calibrated:
+        if calibration_has_key("chat_title", self._current_account_name()):
             return True
         return messagebox.askyesno(
             "提示",
