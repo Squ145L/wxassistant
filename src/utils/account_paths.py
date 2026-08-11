@@ -9,6 +9,9 @@ from pathlib import Path
 
 CACHE_DIR = Path("cache")
 
+# 默认账户名：单模式默认选中、None 账户名的落点（utils 层定义，供各层引用）
+DEFAULT_ACCOUNT_NAME = "默认账户"
+
 # Windows 文件名非法字符 → 下划线
 _INVALID_CHARS = re.compile(r'[\\/:*?"<>|]')
 _WHITESPACE = re.compile(r"\s+")

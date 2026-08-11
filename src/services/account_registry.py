@@ -8,12 +8,11 @@ import logging
 import shutil
 from pathlib import Path
 
-from src.utils.account_paths import account_dir
+from src.utils.account_paths import DEFAULT_ACCOUNT_NAME, account_dir
 
 logger = logging.getLogger(__name__)
 
 ACCOUNTS_PATH = Path("cache/accounts.json")
-DEFAULT_ACCOUNT_NAME = "默认账户"
 
 
 def load_accounts() -> list[str]:
