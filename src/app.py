@@ -134,7 +134,7 @@ def _build_window(multi_session=None):
     from src.ui.main_window import MainWindow
     from src.operations import (
         make_send_callback,
-        make_multi_send_callback,
+        make_pipeline_send_callback,
         make_check_names_callback,
         make_search_contacts_callback,
     )
@@ -193,7 +193,7 @@ def _build_window(multi_session=None):
     window.set_account_runtime(runtime)
 
     window.set_send_callback(
-        make_multi_send_callback(window.get_account_runtime, template_engine, send_service))
+        make_pipeline_send_callback(window.get_account_runtime, template_engine, send_service))
     window.set_check_names_callback(
         make_check_names_callback(window.get_current_bridge, window.get_current_friend_service))
     window.set_search_contacts_callback(

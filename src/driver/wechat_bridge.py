@@ -369,27 +369,19 @@ class WeChatBridge:
         logger.debug("聊天标题区域: (%d,%d)-(%d,%d)", *result)
         return result
 
-    def match_chat_title(self, expected_name: str):
-        """截图聊天标题 → OCR → 从首字符开始匹配
+    def capture_chat_title(self) -> Optional[Image.Image]:
+        """前台：截图聊天标题区域（截图需要窗口在前台，供后台 OCR 使用）"""
+        rect = self._get_chat_title_rect()
+        if rect is None:
+            logger.warning("无法获取聊天标题区域")
+            return None
+        return self.screenshot_region(*rect)
 
-        规则：
-        1. OCR 结果和 expected_name 从第一个字开始比较
-        2. 只要短的是长的前缀就算匹配
-          例: expected="25级李"  ocr="25级李华"  → 匹配
-          例: expected="25级李华" ocr="25级李"   → 匹配
-        3. 返回 OCR 到的实际名称（可能比 expected 长）
+    def ocr_and_match(self, expected_name: str, img: Image.Image):
+        """后台：OCR 识别截图 → 归一化 → 匹配（纯计算，不碰窗口，可跨账户并行）
 
         Returns: (matched: bool, ocr_name: str)
         """
-        title_rect = self._get_chat_title_rect()
-        if title_rect is None:
-            logger.warning("无法获取聊天标题区域")
-            return (False, "")
-
-        img = self.screenshot_region(*title_rect)
-        if img is None:
-            return (False, "")
-
         from OCR import OCREngine
         ocr = OCREngine()
         texts = ocr.recognize_text(img)
@@ -448,6 +440,23 @@ class WeChatBridge:
 
         logger.warning("标题不匹配: '%s' vs '%s' (ocr='%s')", expected_name, cleaned_ocr, ocr_text)
         return (False, "")
+
+    def match_chat_title(self, expected_name: str):
+        """截图聊天标题 → OCR → 从首字符开始匹配（单账户同步路径）
+
+        规则：
+        1. OCR 结果和 expected_name 从第一个字开始比较
+        2. 只要短的是长的前缀就算匹配
+          例: expected="25级李"  ocr="25级李华"  → 匹配
+          例: expected="25级李华" ocr="25级李"   → 匹配
+        3. 返回 OCR 到的实际名称（可能比 expected 长）
+
+        Returns: (matched: bool, ocr_name: str)
+        """
+        img = self.capture_chat_title()
+        if img is None:
+            return (False, "")
+        return self.ocr_and_match(expected_name, img)
 
     # ================================================================
     # 微信操作

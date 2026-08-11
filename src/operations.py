@@ -7,6 +7,7 @@
 import logging
 import queue
 import re
+import threading
 import time
 
 import win32gui
@@ -115,40 +116,130 @@ def make_send_callback(get_bridge, template_engine, send_service):
     return do_send
 
 
-def make_multi_send_callback(get_runtime, template_engine, send_service):
-    """多账户群发：对每个账户的勾选名单，依次用该账户的 bridge 发送，最后汇总一次 __DONE__
+def make_pipeline_send_callback(get_runtime, template_engine, send_service):
+    """多账户流水线并发发送。
+
+    每账户一条线程；全局前台锁保证同一时刻只有一个窗口做前台操作
+    （搜索/打开/检测/截图/发送）。OCR 是后台纯计算、不持前台锁，
+    因此账户 A 的 OCR 时间正好被账户 B 的前台操作填满（流水线交错）。
+
+    每好友流程：①前台 搜索→弹窗检测→截图  ②后台 OCR→匹配  ③前台 发送
 
     get_runtime: () -> {账户名: (bridge, friend_service)}
-    do_multi_send(selected_per_account: dict, ...)  selected_per_account: {账户名: [好友]}
+    do_pipeline_send(selected_per_account: dict, ...)  selected_per_account: {账户名: [好友]}
     """
+    foreground_lock = threading.Lock()   # 全局前台锁：同一时刻仅一个线程做前台操作
+    # onnxruntime InferenceSession.run() 线程安全，OCR 可跨账户真并行（不必加锁）
 
-    def do_multi_send(
+    def do_pipeline_send(
         selected_per_account: dict, message_template: str, attachments: list[str],
         interval: float, regex_pattern: str,
         progress_queue: queue.Queue, stop_event,
     ):
         runtime = get_runtime()
-        all_success = 0
-        all_failed = 0
-        all_failed_list = []
-        all_results = []
+        compiled_regex = None
+        if regex_pattern:
+            try:
+                compiled_regex = re.compile(regex_pattern)
+            except re.error:
+                pass
+
+        total_friends = sum(len(v) for v in selected_per_account.values())
+        results_lock = threading.Lock()
+        all_results: list = []
+        processed = [0]
+
+        def _stopped():
+            return stop_event.is_set()
+
+        def record(result) -> None:
+            with results_lock:
+                all_results.append(result)
+                processed[0] += 1
+                succ = sum(1 for r in all_results if r.success)
+                fail = sum(1 for r in all_results if not r.success)
+            progress_queue.put(("__PROGRESS__", processed[0], total_friends, succ, fail,
+                                result.friend_name or "", result.error or None))
+
+        def _sleep_interruptible(delay: float) -> None:
+            """分片 sleep，随时响应中断"""
+            if delay <= 0:
+                return
+            end = time.time() + delay
+            while time.time() < end:
+                if _stopped():
+                    return
+                time.sleep(0.05)
+
+        def worker(bridge, friends) -> None:
+            for friend in friends:
+                if _stopped():
+                    return
+                name = friend.name
+                try:
+                    regex_match = compiled_regex.search(name) if compiled_regex else None
+                    rendered = template_engine.render(message_template, friend,
+                                                      regex_match=regex_match)
+                    if _stopped():
+                        return
+                    # ① 前台段：搜索 → 弹窗检测 → 截图（持全局前台锁）
+                    with foreground_lock:
+                        if _stopped():
+                            return
+                        found = bridge.search_contacts(name)
+                        if not found:
+                            record(SendResult(friend_name=name, success=False,
+                                              error="联系人不存在(搜索弹窗已关闭)"))
+                            continue
+                        img = bridge.capture_chat_title()
+                    # ② 后台段：OCR → 匹配（不持前台锁，跨账户真并行）
+                    if img is not None:
+                        matched, _ = bridge.ocr_and_match(name, img)
+                    else:
+                        matched = False
+                    if not matched:
+                        record(SendResult(friend_name=name, success=False,
+                                          error="OCR验证失败: 聊天对象不匹配"))
+                        continue
+                    if _stopped():
+                        return
+                    # ③ 前台段：发送（持全局前台锁）
+                    with foreground_lock:
+                        if _stopped():
+                            return
+                        if rendered.strip():
+                            bridge.send_text_message(rendered)
+                        for fp in attachments:
+                            if _stopped():
+                                return
+                            bridge.send_file_message(fp)
+                    record(SendResult(friend_name=name, success=True))
+                except Exception as e:
+                    logger.exception("发送失败: %s", name)
+                    record(SendResult(friend_name=name, success=False, error=str(e)))
+                # 发送间隔（含抖动由 send_service 处理）
+                _sleep_interruptible(interval)
+
+        threads = []
         for name, friends in selected_per_account.items():
-            if not friends or stop_event.is_set():
-                continue
             item = runtime.get(name)
-            if item is None:
+            if item is None or not friends:
                 continue
             bridge, _fs = item
-            batch = _send_friends(bridge, friends, message_template, attachments,
-                                  interval, regex_pattern, progress_queue, stop_event,
-                                  template_engine, send_service)
-            all_success += batch.success
-            all_failed += batch.failed
-            all_failed_list.extend(batch.failed_list)
-            all_results.extend(batch.results)
-        progress_queue.put(("__DONE__", all_success, all_failed, all_failed_list, all_results))
+            bridge.set_stop_check(lambda: stop_event.is_set())   # 前台搜索段可响应中断
+            threads.append(threading.Thread(target=worker, args=(bridge, friends), daemon=True))
 
-    return do_multi_send
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        succ = sum(1 for r in all_results if r.success)
+        fail = sum(1 for r in all_results if not r.success)
+        failed_list = [r for r in all_results if not r.success]
+        progress_queue.put(("__DONE__", succ, fail, failed_list, all_results))
+
+    return do_pipeline_send
 
 
 # ================================================================
