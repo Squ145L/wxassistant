@@ -1,18 +1,20 @@
-"""发送进度条 + 控制按钮 + 日志面板"""
+"""发送进度条 + 控制按钮 + 日志面板（浅色背景块）"""
 
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Optional
 
+from src.ui import ui_kit
+
 
 class SendProgress(ttk.Frame):
-    """底部进度条区域
+    """底部进度条区域（浅色背景块）
 
     包含：进度条、统计标签（X/Y ✅X ❌Y）、开始/终止按钮、状态标签、日志文本框
     """
 
     def __init__(self, parent: tk.Widget):
-        super().__init__(parent, padding=6)
+        super().__init__(parent, style="Block.TFrame", padding=ui_kit.PAD_M)
         self._on_start: Optional[Callable[[], None]] = None
         self._on_stop: Optional[Callable[[], None]] = None
         self._build_ui()
@@ -20,7 +22,7 @@ class SendProgress(ttk.Frame):
     def _build_ui(self):
         # === 进度条 ===
         bar_frame = ttk.Frame(self)
-        bar_frame.pack(fill=tk.X, pady=(0, 4))
+        bar_frame.pack(fill=tk.X, pady=(0, ui_kit.PAD_S))
 
         self._progress = ttk.Progressbar(
             bar_frame,
@@ -35,18 +37,18 @@ class SendProgress(ttk.Frame):
             width=8,
             anchor=tk.CENTER,
         )
-        self._progress_label.pack(side=tk.RIGHT, padx=(8, 0))
+        self._progress_label.pack(side=tk.RIGHT, padx=(ui_kit.PAD_M, 0))
 
         # === 统计 + 按钮行 ===
         ctrl_frame = ttk.Frame(self)
-        ctrl_frame.pack(fill=tk.X, pady=2)
+        ctrl_frame.pack(fill=tk.X, pady=ui_kit.PAD_XS)
 
         # 统计标签
         stats = ttk.Frame(ctrl_frame)
         stats.pack(side=tk.LEFT)
 
         self._label_success = ttk.Label(stats, text="✅ 0", foreground="green")
-        self._label_success.pack(side=tk.LEFT, padx=(0, 12))
+        self._label_success.pack(side=tk.LEFT, padx=(0, ui_kit.PAD_L))
 
         self._label_failed = ttk.Label(stats, text="❌ 0", foreground="red")
         self._label_failed.pack(side=tk.LEFT)
@@ -58,30 +60,31 @@ class SendProgress(ttk.Frame):
             textvariable=self._status_var,
             foreground="gray",
         )
-        self._status_label.pack(side=tk.LEFT, padx=(20, 0))
+        self._status_label.pack(side=tk.LEFT, padx=(ui_kit.PAD_XL, 0))
+
+        # 弹性区：统计/状态 与 按钮 之间，防折叠（布局铁律 1）
+        ui_kit.Spacer(ctrl_frame).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # 按钮
         btn_frame = ttk.Frame(ctrl_frame)
         btn_frame.pack(side=tk.RIGHT)
 
-        self._btn_stop = ttk.Button(
-            btn_frame,
-            text="⏹ 终止",
-            command=self._on_stop_clicked,
-            state=tk.DISABLED,
+        self._btn_stop = ui_kit.make_button(
+            btn_frame, "⏹ 终止", 0, variant="danger",
+            command=self._on_stop_clicked, font=("Microsoft YaHei", 10),
         )
-        self._btn_stop.pack(side=tk.RIGHT, padx=(8, 0))
+        self._btn_stop.pack(side=tk.RIGHT, padx=(ui_kit.PAD_S, 0))
+        self._btn_stop.config(state=tk.DISABLED)
 
-        self._btn_start = ttk.Button(
-            btn_frame,
-            text="▶ 开始群发",
-            command=self._on_start_clicked,
+        self._btn_start = ui_kit.make_button(
+            btn_frame, "▶ 开始群发", 0, variant="success",
+            command=self._on_start_clicked, font=("Microsoft YaHei", 10),
         )
         self._btn_start.pack(side=tk.RIGHT)
 
         # === 日志面板 ===
-        log_frame = ttk.LabelFrame(self, text="发送日志", padding=4)
-        log_frame.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        log_frame = ttk.LabelFrame(self, text="发送日志", padding=ui_kit.PAD_S)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(ui_kit.PAD_M, 0))
 
         self._log_text = tk.Text(
             log_frame,
