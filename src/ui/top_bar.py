@@ -91,7 +91,7 @@ class TopBar(ttk.Frame):
         self._btn_settings = ttk.Button(self, text="设置", width=4, command=self._make_cmd("_on_settings"))
         self._btn_help = ttk.Button(self, text="帮助", width=4, command=self._make_cmd("_on_help"))
         self._btn_multiopen = ttk.Button(self, text="多开", width=7, command=self._make_cmd("_on_multiopen"))
-        self._btn_account_mgr = ttk.Button(self, text="账户管理", width=6,
+        self._btn_account_mgr = ttk.Button(self, text="账户管理", width=8,
                                            command=self._make_cmd("_on_account_manager"))
 
         # 布局：左侧分组菜单 → 账户 → 多开/账户管理 → 弹性区 → 右侧 帮助/设置/刷新
