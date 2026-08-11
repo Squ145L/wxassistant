@@ -24,6 +24,9 @@ class FriendList(ttk.Frame):
         self._tag_var = tk.StringVar(value="全部")
         self._match_label_var = tk.StringVar(value="匹配 0/0 人")
         self._on_tag_filter: Optional[Callable[[str], None]] = None
+        # 搜索框占位符（未输入时浅色 "搜索..."）
+        self._placeholder_text = "搜索..."
+        self._placeholder_active = True
 
         self._on_add: Optional[Callable[[str], bool]] = None
         self._on_delete: Optional[Callable[[list], bool]] = None
@@ -59,6 +62,7 @@ class FriendList(ttk.Frame):
         self._filter_entry = ttk.Entry(filter_row, textvariable=self._filter_var,
                                        font=("Consolas", 10), width=16)
         self._filter_entry.pack(side=tk.LEFT)
+        self._setup_search_placeholder()
         ttk.Button(filter_row, text="✕", width=3, command=self.clear_filter).pack(
             side=tk.LEFT, padx=(ui_kit.PAD_XS, 0))
         self._cb_regex = ttk.Checkbutton(filter_row, text=".*", variable=self._regex_mode)
@@ -74,6 +78,28 @@ class FriendList(ttk.Frame):
         self._match_label = ttk.Label(filter_row, textvariable=self._match_label_var,
                                       foreground="gray", font=("", 9))
         self._match_label.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+
+        # ---- 操作行（搜索框下面一行）：➕/删除 (Spacer) 已选x/y 全选 反选 ----
+        actions = ttk.Frame(self)
+        actions.pack(fill=tk.X, padx=ui_kit.PAD_S, pady=(ui_kit.PAD_S, 0))
+        self._btn_add = ttk.Button(actions, text="➕", width=3, command=self._pop_add_menu)
+        self._btn_add.pack(side=tk.LEFT)
+        self._add_menu = tk.Menu(self, tearoff=0)
+        self._add_menu.add_command(label="手动添加", command=self._add_friend)
+        self._add_menu.add_command(label="搜索并导入", command=self._on_search_menu)
+        self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
+        # 删除：默认按钮外观 + 红字（ui_kit Danger.TButton 只染文字色）
+        ttk.Button(actions, text="删除", style="Danger.TButton", width=4,
+                   command=self._delete_friend).pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
+        ui_kit.Spacer(actions).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._label_count = ttk.Label(actions, text="", foreground="gray", font=("", 9))
+        self._label_count.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+        self._cb_select_all = ttk.Checkbutton(
+            actions, text="全选", variable=self._select_all_var,
+            command=self._on_select_all_toggle,
+        )
+        self._cb_select_all.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
+        ttk.Button(actions, text="反选", width=4, command=self.invert_selection).pack(side=tk.RIGHT)
 
         ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(ui_kit.PAD_S, 0))
 
@@ -114,34 +140,35 @@ class FriendList(ttk.Frame):
 
         self._tree.tag_configure("failed", foreground="red")
 
-        # ---- 底部操作行：➕/删除 (Spacer) 共N人 全选 反选 ----
-        bottom = ttk.Frame(self)
-        bottom.pack(fill=tk.X, padx=ui_kit.PAD_S, pady=(ui_kit.PAD_S, 0))
-        self._btn_add = ttk.Button(bottom, text="➕", width=3, command=self._pop_add_menu)
-        self._btn_add.pack(side=tk.LEFT)
-        self._add_menu = tk.Menu(self, tearoff=0)
-        self._add_menu.add_command(label="手动添加", command=self._add_friend)
-        self._add_menu.add_command(label="搜索并导入", command=self._on_search_menu)
-        self._add_menu.add_command(label="扫描通讯录并导入", command=self._on_import_menu)
-        # 删除：走 ui_kit 的 Danger.TButton（configure_style 已定义）
-        ttk.Button(bottom, text="删除", style="Danger.TButton", width=4,
-                   command=self._delete_friend).pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
-        ui_kit.Spacer(bottom).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._label_count = ttk.Label(bottom, text="", foreground="gray", font=("", 9))
-        self._label_count.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
-        self._cb_select_all = ttk.Checkbutton(
-            bottom, text="全选", variable=self._select_all_var,
-            command=self._on_select_all_toggle,
-        )
-        self._cb_select_all.pack(side=tk.RIGHT, padx=(0, ui_kit.PAD_S))
-        ttk.Button(bottom, text="反选", width=4, command=self.invert_selection).pack(side=tk.RIGHT)
-
     # ================================================================
     # 筛选（原 FilterBar 逻辑）
     # ================================================================
 
+    def _setup_search_placeholder(self) -> None:
+        """搜索框空时显示浅色 "搜索..." 占位（不参与筛选）"""
+        self._filter_entry.insert(0, self._placeholder_text)
+        self._filter_entry.config(foreground="gray")
+        self._filter_entry.bind("<FocusIn>", self._on_search_focus_in)
+        self._filter_entry.bind("<FocusOut>", self._on_search_focus_out)
+
+    def _on_search_focus_in(self, _e=None) -> None:
+        if self._placeholder_active:
+            self._placeholder_active = False
+            self._filter_entry.delete(0, tk.END)
+            self._filter_entry.config(foreground="black")
+
+    def _on_search_focus_out(self, _e=None) -> None:
+        if not self._filter_var.get().strip():
+            self._placeholder_active = True
+            self._filter_entry.delete(0, tk.END)
+            self._filter_entry.insert(0, self._placeholder_text)
+            self._filter_entry.config(foreground="gray")
+
     @property
     def filter_text(self) -> str:
+        # 占位符状态下视为未输入
+        if self._placeholder_active:
+            return ""
         return self._filter_var.get().strip()
 
     @property
@@ -175,8 +202,12 @@ class FriendList(ttk.Frame):
         self._regex_hint.config(text=text, foreground="#2196F3")
 
     def clear_filter(self) -> None:
-        """清空筛选文字 + 正则模式 + 标签筛选（账户切换时调用，防串账户）"""
+        """清空筛选 + 恢复浅色占位符（账户切换时调用，防串账户）"""
+        self._placeholder_active = True
         self._filter_var.set("")
+        self._filter_entry.delete(0, tk.END)
+        self._filter_entry.insert(0, self._placeholder_text)
+        self._filter_entry.config(foreground="gray")
         self._regex_mode.set(False)
         self._tag_var.set("全部")
         self.set_regex_error("")
@@ -184,6 +215,8 @@ class FriendList(ttk.Frame):
 
     def _on_filter_var_changed(self, *_args) -> None:
         """搜索/正则变化 → 提示更新 + 触发外部重筛（<<FilterChanged>>）"""
+        if self._placeholder_active:
+            return  # 占位符的插入/删除不触发筛选
         from src.services.friend_service import FriendService
         if self._regex_mode.get() and self.filter_text:
             compiled = FriendService.try_compile_regex(self.filter_text)

@@ -65,9 +65,9 @@ class MessageEditor(ttk.Frame):
         )
         self._var_hint.pack(anchor=tk.W, pady=(ui_kit.PAD_XS, ui_kit.PAD_M))
 
-        # === 附件区 ===
+        # === 附件区（自适应窗口：随窗口高度伸缩）===
         attach_frame = ttk.LabelFrame(self, text="📎 附件", padding=ui_kit.PAD_M)
-        attach_frame.pack(fill=tk.X, pady=(0, ui_kit.PAD_M))
+        attach_frame.pack(fill=tk.BOTH, expand=True, pady=(0, ui_kit.PAD_M))
 
         btn_row = ttk.Frame(attach_frame)
         btn_row.pack(fill=tk.X)
@@ -91,7 +91,7 @@ class MessageEditor(ttk.Frame):
             font=("", 9),
             relief=tk.FLAT,
         )
-        self._attach_listbox.pack(fill=tk.X, pady=(ui_kit.PAD_S, 0))
+        self._attach_listbox.pack(fill=tk.BOTH, expand=True, pady=(ui_kit.PAD_S, 0))
 
         # === 选中计数 ===
         self._selected_var = tk.StringVar(value="已选 0 人")

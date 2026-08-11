@@ -60,15 +60,13 @@ def _borrow_clam_element(style: ttk.Style, elem_name: str, source: str) -> str:
 
 
 def _setup_colored_button(style: ttk.Style, name: str, color: str) -> None:
-    """配置一个彩色按钮样式（Primary/Success/Danger），跨主题显示背景色"""
-    elem = _borrow_clam_element(style, "ui.ColoredButton", "Button.button")
+    """配置一个「默认外观 + 彩色文字」按钮样式（Primary/Success/Danger）。
+
+    不填充背景、不用自定义 layout —— 按钮保持主题默认外观，只把文字染成
+    variant 的颜色（如 删除=红字）。
+    """
     style_name = f"{name}.TButton"
-    style.layout(style_name, [
-        (elem, {"sticky": "nswe", "children": [
-            ("Button.focus", {"sticky": "nswe", "children": [
-                ("Button.label", {"sticky": "nswe"})]})]})])
-    style.configure(style_name, background=color, foreground="white")
-    style.map(style_name, background=[("active", color), ("pressed", color)])
+    style.configure(style_name, foreground=color)
 
 
 def _setup_block_frame(style: ttk.Style) -> None:
