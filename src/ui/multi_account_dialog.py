@@ -26,6 +26,12 @@ class MultiOpenWizard:
         self.root.title("多开设置")
         self.root.geometry("480x440")
         self.root.minsize(400, 320)
+        # 屏幕居中（主窗口已销毁，无父窗口可相对）
+        self.root.update_idletasks()
+        _w, _h = 480, 440
+        _x = (self.root.winfo_screenwidth() - _w) // 2
+        _y = (self.root.winfo_screenheight() - _h) // 2
+        self.root.geometry(f"{_w}x{_h}+{_x}+{_y}")
 
         self._frames: list[tuple[int, str, str]] = []
         self._session = MultiAccountSession()
@@ -148,6 +154,13 @@ class MultiOpenWizard:
         btn.pack(pady=(8, 12))
         ttk.Button(btn, text="确定", command=_ok).pack(side=tk.LEFT, padx=4)
         ttk.Button(btn, text="取消", command=dlg.destroy).pack(side=tk.LEFT, padx=4)
+        # 相对向导窗口居中（tkinter 默认不定位，会叠在父窗口标题栏上）
+        dlg.update_idletasks()
+        _w = dlg.winfo_reqwidth()
+        _h = dlg.winfo_reqheight()
+        _x = self.root.winfo_rootx() + (self.root.winfo_width() - _w) // 2
+        _y = self.root.winfo_rooty() + (self.root.winfo_height() - _h) // 2
+        dlg.geometry(f"{_w}x{_h}+{_x}+{_y}")
         dlg.wait_window()
         return result[0]
 

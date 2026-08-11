@@ -7,7 +7,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional, Callable
 
-from src.utils.config import DEFAULT_SEND_INTERVAL, INTERVAL_JITTER_RATIO
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +43,14 @@ class SendService:
 
     def __init__(
         self,
-        base_interval: float = DEFAULT_SEND_INTERVAL,
-        jitter_ratio: float = INTERVAL_JITTER_RATIO,
+        base_interval: Optional[float] = None,
+        jitter_ratio: Optional[float] = None,
     ):
-        self.base_interval = base_interval
-        self.jitter_ratio = jitter_ratio
+        # 默认值来自 设置→延迟（全局不分账户）；显式传参优先
+        from src.utils.settings_store import load_delay_settings
+        _d = load_delay_settings()
+        self.base_interval = base_interval if base_interval is not None else _d["op_send_interval"]
+        self.jitter_ratio = jitter_ratio if jitter_ratio is not None else _d["op_send_jitter"]
         self._stop_event = threading.Event()
         self._is_running = False
 

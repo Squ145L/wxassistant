@@ -17,13 +17,7 @@ import pyperclip
 from PIL import Image, ImageGrab
 
 from src.utils.calibration import load_calibration
-from src.utils.config import (
-    WEIXIN_WINDOW_TITLES,
-    CLIPBOARD_DELAY,
-    ACTIVATE_DELAY,
-    SEARCH_DELAY,
-    FILE_SEND_DELAY,
-)
+from src.utils.config import WEIXIN_WINDOW_TITLES
 from src.utils.coordinates import get_coord, resolve_calibration_rect
 
 logger = logging.getLogger(__name__)
@@ -54,6 +48,16 @@ class WeChatBridge:
         self._hook_resume = None
         self._excluded_hwnds: set[int] = set()
         self._account_name: Optional[str] = None
+        # 操作间延迟（设置→延迟，全局不分账户；构造时读一次快照）
+        from src.utils.settings_store import load_delay_settings
+        _d = load_delay_settings()
+        self._activate_delay = _d["op_activate_delay"]
+        self._search_delay = _d["op_search_delay"]
+        self._clipboard_delay = _d["op_clipboard_delay"]
+        self._paste_delay = _d["op_paste_delay"]
+        self._send_after_delay = _d["op_send_after_delay"]
+        self._file_send_delay = _d["op_file_send_delay"]
+        self._key_press_delay = _d["op_key_press_delay"]
 
     def set_stop_check(self, checker):
         self._stop_check = checker
@@ -192,7 +196,7 @@ class WeChatBridge:
             win32gui.SetForegroundWindow(hwnd)
             win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
 
-            time.sleep(ACTIVATE_DELAY)
+            time.sleep(self._activate_delay)
             logger.info("窗口已激活: 0x%X", hwnd)
             return True
 
@@ -260,11 +264,11 @@ class WeChatBridge:
     def _paste_and_enter(self, text: str):
         """剪贴板复制 → Ctrl+V 粘贴 → Enter 发送"""
         pyperclip.copy(text)
-        time.sleep(CLIPBOARD_DELAY)
+        time.sleep(self._clipboard_delay)
         self._send_keys('{Ctrl}v')
-        time.sleep(0.03)          # 粘贴后稍等
+        time.sleep(self._paste_delay)          # 粘贴后稍等
         self._send_keys('{Enter}')
-        time.sleep(0.05)          # 发送后稍等
+        time.sleep(self._send_after_delay)     # 发送后稍等
 
     # ================================================================
     # 鼠标模拟
@@ -275,9 +279,9 @@ class WeChatBridge:
         if self._hook_suspend: self._hook_suspend()
         logger.info("click_at: (%d, %d)", x, y)
         win32api.SetCursorPos((x, y))
-        time.sleep(0.02)
+        time.sleep(self._key_press_delay)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-        time.sleep(0.03)
+        time.sleep(self._key_press_delay)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
         if self._hook_resume: self._hook_resume()
 
@@ -286,7 +290,7 @@ class WeChatBridge:
         if self._hook_suspend: self._hook_suspend()
         try:
             win32api.SetCursorPos((x, y))
-            time.sleep(0.02)
+            time.sleep(self._key_press_delay)
             win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, delta, 0)
         except Exception:
             logger.exception("滚轮失败")
@@ -471,12 +475,12 @@ class WeChatBridge:
         main_hwnd = self._hwnd
         if self._should_stop(): return False
         self._send_keys('{Ctrl}f')
-        time.sleep(0.03)
+        time.sleep(self._key_press_delay)
         if self._should_stop(): return False
         self._send_keys('{Ctrl}a')
-        time.sleep(0.03)
+        time.sleep(self._key_press_delay)
         self._paste_and_enter(keyword)
-        time.sleep(SEARCH_DELAY)
+        time.sleep(self._search_delay)
         if self._should_stop(): return False
 
         if self._close_search_popup():
@@ -589,11 +593,11 @@ class WeChatBridge:
             return
         # CF_HDROP 格式复制文件到剪贴板（不是路径文字）
         self._copy_file_to_clipboard(filepath)
-        time.sleep(0.1)
+        time.sleep(self._file_send_delay)
         self._send_keys('{Ctrl}v')
-        time.sleep(0.1)
+        time.sleep(self._file_send_delay)
         self._send_keys('{Enter}')
-        time.sleep(FILE_SEND_DELAY)
+        time.sleep(self._file_send_delay)
 
     @staticmethod
     def _copy_file_to_clipboard(filepath: str):

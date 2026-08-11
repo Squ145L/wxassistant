@@ -16,11 +16,19 @@ from src.utils.coordinates import (
 from src.utils.settings_store import (
     DEFAULT_SETTINGS,
     load_account_settings,
+    load_delay_settings,
     load_scan_settings,
     load_settings,
     save_account_settings,
     save_settings,
 )
+
+
+# OCR 模型集选项（值 → 展示标签）
+OCR_MODELS = {
+    "v5": "v5 移动端（默认，字库更全）",
+    "v4": "v4 经典（更快更小）",
+}
 
 
 # 浮点数百分比校验
@@ -70,6 +78,22 @@ class SettingsDialog(tk.Toplevel):
         self._mo_account_interval = tk.DoubleVar(value=self._settings.get("multi_open_account_interval", 3.0))
         self._mo_send_interval = tk.DoubleVar(value=self._settings.get("multi_open_send_interval", 0.1))
         self._mo_popup_retry = tk.IntVar(value=self._settings.get("multi_open_popup_retry", 0))
+
+        # 操作间延迟参数（设置→延迟，全局不分账户）
+        _dl = load_delay_settings()
+        self._op_activate = tk.DoubleVar(value=_dl["op_activate_delay"])
+        self._op_search = tk.DoubleVar(value=_dl["op_search_delay"])
+        self._op_clipboard = tk.DoubleVar(value=_dl["op_clipboard_delay"])
+        self._op_paste = tk.DoubleVar(value=_dl["op_paste_delay"])
+        self._op_send_after = tk.DoubleVar(value=_dl["op_send_after_delay"])
+        self._op_file_send = tk.DoubleVar(value=_dl["op_file_send_delay"])
+        self._op_key_press = tk.DoubleVar(value=_dl["op_key_press_delay"])
+        self._op_send_interval = tk.DoubleVar(value=_dl["op_send_interval"])
+        self._op_send_jitter = tk.DoubleVar(value=_dl["op_send_jitter"])
+
+        # OCR 模型集（全局不分账户）
+        _ocr_value = self._settings.get("ocr_model", "v5")
+        self._ocr_model = tk.StringVar(value=OCR_MODELS.get(_ocr_value, OCR_MODELS["v5"]))
 
         # 坐标变量（延迟加载，从 coordinates.py）
         self._coord_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
@@ -136,6 +160,15 @@ class SettingsDialog(tk.Toplevel):
 
         ttk.Separator(ocr_body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
 
+        ttk.Label(ocr_body, text="OCR 模型:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 6))
+        model_row = ttk.Frame(ocr_body)
+        model_row.pack(fill=tk.X, pady=(0, 2))
+        ttk.Combobox(model_row, textvariable=self._ocr_model,
+                     values=list(OCR_MODELS.values()), state="readonly", width=30).pack(side=tk.LEFT)
+        ttk.Label(model_row, text="更改后重启程序生效（模型启动时加载一次）",
+                  foreground="gray", font=("", 9)).pack(side=tk.LEFT, padx=8)
+        ttk.Separator(ocr_body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
+
         ttk.Label(ocr_body, text="调试选项:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
         ttk.Checkbutton(ocr_body, text="保存调试截图 (cache/debug_scan/)", variable=self._ocr_debug).pack(anchor=tk.W)
 
@@ -183,10 +216,32 @@ class SettingsDialog(tk.Toplevel):
         ttk.Label(retry_row, text="弹窗检测重试次数:").pack(side=tk.LEFT)
         ttk.Spinbox(retry_row, from_=0, to=5, textvariable=self._mo_popup_retry, width=6).pack(side=tk.RIGHT)
 
-        # ---- 标签5: 更新 ----
+        # ---- 标签5: 延迟 ----
         tab5 = ttk.Frame(nb, padding=16)
-        nb.add(tab5, text="更新")
-        self._build_update_tab(tab5)
+        nb.add(tab5, text="延迟")
+
+        ttk.Label(tab5, text="操作之间的延迟（所有账户共用，存 cache/settings.json）：",
+                  font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+
+        _row_delay(tab5, "窗口激活延迟 (s):", self._op_activate)
+        _row_delay(tab5, "搜索后延迟 (s):", self._op_search)
+        _row_delay(tab5, "剪贴板复制延迟 (s):", self._op_clipboard)
+        _row_delay(tab5, "粘贴后延迟 (s):", self._op_paste)
+        _row_delay(tab5, "发送后延迟 (s):", self._op_send_after)
+        _row_delay(tab5, "文件发送延迟 (s):", self._op_file_send)
+        _row_delay(tab5, "组合键事件间隔 (s):", self._op_key_press)
+
+        ttk.Separator(tab5, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+
+        _row_delay(tab5, "消息基础间隔 (s):", self._op_send_interval)
+        _row_delay(tab5, "间隔抖动比例 (0~1):", self._op_send_jitter)
+        ttk.Label(tab5, text="抖动 = 每次实际间隔在基础值 ±该比例 内随机。",
+                  foreground="gray", font=("", 9)).pack(anchor=tk.W, pady=(4, 0))
+
+        # ---- 标签6: 更新 ----
+        tab6 = ttk.Frame(nb, padding=16)
+        nb.add(tab6, text="更新")
+        self._build_update_tab(tab6)
 
         # 跳到指定标签
         if self._initial_tab == "OCR":
@@ -195,8 +250,10 @@ class SettingsDialog(tk.Toplevel):
             nb.select(tab3)
         elif self._initial_tab == "多开":
             nb.select(tab4)
-        elif self._initial_tab == "更新":
+        elif self._initial_tab == "延迟":
             nb.select(tab5)
+        elif self._initial_tab == "更新":
+            nb.select(tab6)
 
         # ---- 底部 ----
         btn_frame = ttk.Frame(self, padding=12)
@@ -217,6 +274,19 @@ class SettingsDialog(tk.Toplevel):
         self._settings["multi_open_account_interval"] = float(self._mo_account_interval.get())
         self._settings["multi_open_send_interval"] = float(self._mo_send_interval.get())
         self._settings["multi_open_popup_retry"] = int(self._mo_popup_retry.get())
+        self._settings["op_activate_delay"] = float(self._op_activate.get())
+        self._settings["op_search_delay"] = float(self._op_search.get())
+        self._settings["op_clipboard_delay"] = float(self._op_clipboard.get())
+        self._settings["op_paste_delay"] = float(self._op_paste.get())
+        self._settings["op_send_after_delay"] = float(self._op_send_after.get())
+        self._settings["op_file_send_delay"] = float(self._op_file_send.get())
+        self._settings["op_key_press_delay"] = float(self._op_key_press.get())
+        self._settings["op_send_interval"] = float(self._op_send_interval.get())
+        self._settings["op_send_jitter"] = float(self._op_send_jitter.get())
+        # OCR 模型（展示标签 → 值）
+        _label = self._ocr_model.get()
+        self._settings["ocr_model"] = next(
+            (k for k, v in OCR_MODELS.items() if v == _label), "v5")
         save_settings(self._settings)
         # name_source 是账户级设置
         save_account_settings(self._account_name or "",

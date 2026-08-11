@@ -45,9 +45,11 @@ def main():
 
     # OCR 模型后台预热：首次加载约需 1-2 分钟，若发生在检查/发送操作内会阻塞且无法中断。
     # 启动即后台加载，操作时模型已就绪；日志自动进发送日志面板。
+    # 先按 设置→OCR 的 ocr_model 套用模型集档位，再预热（改档位需重启生效）。
     import threading
-    from OCR.engine import warmup_ocr
-    threading.Thread(target=warmup_ocr, daemon=True).start()
+    from OCR import engine as _ocr_engine
+    _ocr_engine.OCR_MODEL_PROFILE = load_settings().get("ocr_model", "v5")
+    threading.Thread(target=_ocr_engine.warmup_ocr, daemon=True).start()
 
     if args.test_bridge:
         from src.app import cmd_test_bridge

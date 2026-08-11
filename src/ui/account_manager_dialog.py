@@ -28,6 +28,26 @@ class AccountManagerDialog(tk.Toplevel):
         self._on_switch = on_switch      # (name) -> None，双击切换回调
         self._build_ui()
         self._refresh()
+        self._center(self.master)   # 居中到主窗口（Toplevel 默认落在屏幕角落）
+
+    def _center(self, parent: tk.Widget) -> None:
+        """弹窗居中到父窗口（复用 settings_dialog 的定位模式）"""
+        self.update_idletasks()
+        try:
+            w, h = self.winfo_width(), self.winfo_height()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            px, py = parent.winfo_rootx(), parent.winfo_rooty()
+            sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+            if pw > 10 and ph > 10:
+                x, y = px + (pw - w) // 2, py + (ph - h) // 2
+            else:
+                x, y = (sw - w) // 2, (sh - h) // 2
+            # 边界检测：不超出屏幕
+            x = max(0, min(x, sw - w))
+            y = max(0, min(y, sh - h))
+            self.geometry(f"+{x}+{y}")
+        except Exception as e:
+            logger.warning("账户管理弹窗居中失败: %s", e)
 
     def _build_ui(self):
         frame = ttk.Frame(self, padding=10)

@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from typing import Callable, Optional
 
-from src.utils.config import DEFAULT_SEND_INTERVAL, MAX_ATTACHMENT_COUNT
+from src.utils.config import MAX_ATTACHMENT_COUNT
 from src.ui import ui_kit
 
 
@@ -116,7 +116,9 @@ class MessageEditor(ttk.Frame):
         return list(self._attachments)
 
     def get_interval(self) -> float:
-        return DEFAULT_SEND_INTERVAL
+        """消息基础间隔（设置→延迟，全局不分账户）"""
+        from src.utils.settings_store import load_delay_settings
+        return load_delay_settings()["op_send_interval"]
 
     def set_selected_count(self, count: int):
         self._selected_var.set(f"已选 {count} 人")

@@ -9,10 +9,12 @@ WEIXIN_PROCESS_NAME = "Weixin.exe"
 # send_service 间隔只需极小的呼吸时间
 DEFAULT_SEND_INTERVAL = 0.1        # 两条消息之间的基础间隔（搜索内部已有延迟）
 INTERVAL_JITTER_RATIO = 0.3       # ±30% 随机抖动
-KEY_PRESS_DELAY = 0.02            # 组合键各事件间隔
+KEY_PRESS_DELAY = 0.02            # 组合键/鼠标事件间隔
 CLIPBOARD_DELAY = 0.05            # 剪贴板操作后等待
 ACTIVATE_DELAY = 0.2              # 窗口激活后等待
 SEARCH_DELAY = 0.1                # Ctrl+F 搜索后等待结果出现
+PASTE_DELAY = 0.03                # Ctrl+V 粘贴后等待
+SEND_AFTER_DELAY = 0.05           # Enter 发送后等待
 FILE_SEND_DELAY = 0.1             # 文件发送后等待
 
 # ========== OCR ==========

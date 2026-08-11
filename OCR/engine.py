@@ -23,6 +23,11 @@ OCR_CACHE_TTL = 30                # 同搜索词缓存秒数
 OCR_MODEL_DIR = Path(__file__).parent / "models"  # 本地模型目录
 OCR_CONFUSION_PATH = Path(__file__).parent / "ocr_confusion.json"  # 字符混淆映射
 
+# 模型集档位：v5（移动端高精度，字库更全）/ v4（经典，更快更小）。
+# 默认 v5；app 启动时按 设置→OCR 的 ocr_model 覆盖（见 main.py）。
+# 独立模块原则：引擎不反向 import 项目代码，由 app 显式配置。
+OCR_MODEL_PROFILE = "v5"
+
 # RapidOCR 全局单例（惰性加载，线程安全）
 _ocr_instance: Optional[object] = None
 _ocr_lock = threading.Lock()
@@ -41,18 +46,21 @@ def _get_ocr():
             logger.info("正在加载 RapidOCR 模型...")
             from rapidocr_onnxruntime import RapidOCR
 
-            # 扫描本地模型和字典
+            # 扫描本地模型和字典（rec 按档位选：v5_rec / v4_rec）
             det_model = None
             rec_model = None
             dict_file = None
+            rec_marker = f"{OCR_MODEL_PROFILE}_rec"
             if OCR_MODEL_DIR.exists():
                 for f in OCR_MODEL_DIR.iterdir():
                     name = f.name.lower()
-                    if "det" in name and name.endswith(".onnx"):
-                        det_model = str(f)
-                    elif "rec" in name and name.endswith(".onnx"):
-                        rec_model = str(f)
-                    elif name.endswith(".txt"):
+                    if name.endswith(".onnx"):
+                        if "det" in name:
+                            det_model = str(f)
+                        elif rec_marker in name:
+                            rec_model = str(f)
+                    elif name.endswith(".txt") and OCR_MODEL_PROFILE == "v5":
+                        # 字典只配 v5 用；v4 走 RapidOCR 内置默认字典
                         dict_file = str(f)
                         logger.info("找到字典文件: %s", f.name)
 

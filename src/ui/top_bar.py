@@ -54,8 +54,7 @@ class TopBar(ttk.Frame):
     # ================================================================
 
     def _build_ui(self) -> None:
-        # ---- 账户（多账户模式显示）----
-        self._account_label = ttk.Label(self, text="账户:")
+        # ---- 账户下拉（无"账户:"标签，保持顶栏简洁）----
         self._account_combo = ttk.Combobox(self, state="readonly", width=10)
 
         # ---- 联系人菜单（普通按钮外观 + tk_popup 展开；Menubutton 原生样式怪异故不用）----
@@ -82,8 +81,7 @@ class TopBar(ttk.Frame):
 
         # 布局：账户 → 账户管理 → 多开 → 联系人▾ → 弹性区 → 右侧 帮助/设置/刷新
         # （弹性区吸收多余空间，固定控件永不互相挤压折叠 —— 布局铁律 1）
-        self._account_label.pack(side=tk.LEFT)
-        self._account_combo.pack(side=tk.LEFT, padx=(0, ui_kit.PAD_S))
+        self._account_combo.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, ui_kit.PAD_S))
         self._btn_account_mgr.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         self._btn_multiopen.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))
         self._btn_contacts.pack(side=tk.LEFT, padx=(ui_kit.PAD_S, 0))

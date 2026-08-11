@@ -9,6 +9,11 @@ import logging
 from pathlib import Path
 
 from src.utils.account_paths import account_settings_path_for
+from src.utils.config import (
+    ACTIVATE_DELAY, SEARCH_DELAY, CLIPBOARD_DELAY, PASTE_DELAY,
+    SEND_AFTER_DELAY, FILE_SEND_DELAY, KEY_PRESS_DELAY,
+    DEFAULT_SEND_INTERVAL, INTERVAL_JITTER_RATIO,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,7 @@ DEFAULT_SETTINGS = {
     "scan_scroll_px": 1200,
     "scan_pages_per_scroll": 12,
     "logging_enabled": True,
+    "ocr_model": "v5",              # OCR 模型集档位：v5 移动端高精度 / v4 经典快速（全局不分账户）
     # ---- 多开（流水线并发发送的时序参数，阶段2 启用读取）----
     "multi_open_activate_delay": 0.2,       # 窗口激活后等待 (s)
     "multi_open_search_delay": 0.1,         # 搜索 Enter 后、弹窗检测前 (s)
@@ -29,6 +35,16 @@ DEFAULT_SETTINGS = {
     "multi_open_account_interval": 3.0,     # 两个账户最后一步之间 (s)
     "multi_open_send_interval": 0.1,        # 发送基础间隔 (s)
     "multi_open_popup_retry": 0,            # 弹窗检测重试次数
+    # ---- 操作间延迟（设置→延迟 标签页，全局不分账户）----
+    "op_activate_delay": ACTIVATE_DELAY,        # 窗口激活后等待 (s)
+    "op_search_delay": SEARCH_DELAY,            # Ctrl+F 搜索 Enter 后等待 (s)
+    "op_clipboard_delay": CLIPBOARD_DELAY,      # 剪贴板复制后等待 (s)
+    "op_paste_delay": PASTE_DELAY,              # Ctrl+V 粘贴后等待 (s)
+    "op_send_after_delay": SEND_AFTER_DELAY,    # Enter 发送后等待 (s)
+    "op_file_send_delay": FILE_SEND_DELAY,      # 文件发送后等待 (s)
+    "op_key_press_delay": KEY_PRESS_DELAY,      # 组合键/鼠标事件间隔 (s)
+    "op_send_interval": DEFAULT_SEND_INTERVAL,  # 两条消息之间基础间隔 (s)
+    "op_send_jitter": INTERVAL_JITTER_RATIO,    # 发送间隔 ±抖动比例 (0~1)
 }
 
 # 账户级设置（每个账户独立，存在 账户文件夹/settings.json）
@@ -55,6 +71,22 @@ def load_scan_settings() -> dict:
     s = load_settings()
     return {"page_count": s["scan_page_count"], "scroll_px": s["scan_scroll_px"],
             "pages_per_scroll": s["scan_pages_per_scroll"]}
+
+
+_DELAY_KEYS = (
+    "op_activate_delay", "op_search_delay", "op_clipboard_delay",
+    "op_paste_delay", "op_send_after_delay", "op_file_send_delay",
+    "op_key_press_delay", "op_send_interval", "op_send_jitter",
+)
+
+
+def load_delay_settings() -> dict:
+    """返回操作间延迟参数（用户覆盖 → 默认值）
+
+    设置→延迟 标签页的读取入口，也是 bridge/send_service 取延迟的唯一途径。
+    """
+    s = load_settings()
+    return {k: s.get(k, DEFAULT_SETTINGS[k]) for k in _DELAY_KEYS}
 
 
 def save_settings(settings: dict) -> None:
