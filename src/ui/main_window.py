@@ -7,7 +7,7 @@ import threading
 import time
 import tkinter as tk
 from pathlib import Path
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from typing import Optional, Callable
 
 from src.utils.config import (
@@ -188,6 +188,7 @@ class MainWindow:
         self.top_bar.set_on_help(self._on_help_clicked)
         self.top_bar.set_on_multiopen(self._on_multiopen_clicked)
         self.top_bar.set_on_account_manager(self._on_account_manager_clicked)
+        self.top_bar.set_on_add_account(self._on_add_account_clicked)
 
         # 账户选择器始终创建；账户列表由 set_account_runtime 填充
         self._account_var = tk.StringVar()
@@ -511,6 +512,33 @@ class MainWindow:
         dlg.wait_window()
         self._refresh_accounts()   # 对话框可能新建/删除/重命名了账户，统一刷新
 
+    def _on_add_account_clicked(self) -> None:
+        """账户下拉「添加账户..」：输入新账户名 → 写入注册表 → 切换到新账户"""
+        from src.services.account_registry import load_accounts, save_accounts
+        name = simpledialog.askstring("添加账户", "新账户名：", parent=self.root)
+        if not name or not name.strip():
+            self._revert_account_combo()
+            return
+        name = name.strip()
+        names = load_accounts()
+        if name in names:
+            messagebox.showwarning("提示", f"账户「{name}」已存在。")
+            self._revert_account_combo()
+            return
+        save_accounts(names + [name])
+        logger.info("新建账户: %s", name)
+        self._refresh_accounts(name)   # 重建运行时并选中新账户
+
+    def _revert_account_combo(self) -> None:
+        """「添加账户..」被取消/失败时，把账户下拉恢复显示当前账户"""
+        if self._account_var is None:
+            return
+        fallback = self._active_account
+        if not fallback and self._account_runtime:
+            fallback = next(iter(self._account_runtime))
+        if fallback:
+            self._account_var.set(fallback)
+
     def _refresh_accounts(self, select_name: Optional[str] = None) -> None:
         """账户列表变更后重建运行时（复用已有 bridge）+ 重选账户"""
         from src.services.account_registry import load_accounts
@@ -771,6 +799,7 @@ class MainWindow:
         if not message.strip():
             messagebox.showwarning("提示", "请输入消息内容。")
             return
+        self.message_editor.flush()   # 发送前立即保存模板（含未落盘的防抖内容）
 
         # 多账户模式：发送前检测窗口重叠（防止切窗操作点错窗口）
         if not self._check_window_overlap():

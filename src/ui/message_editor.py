@@ -5,6 +5,7 @@ from tkinter import ttk, filedialog, messagebox
 from typing import Callable, Optional
 
 from src.utils.config import MAX_ATTACHMENT_COUNT
+from src.services.template_store import load_template, save_template
 from src.ui import ui_kit
 
 
@@ -15,7 +16,10 @@ class MessageEditor(ttk.Frame):
         super().__init__(parent, padding=ui_kit.PAD_M)
         self._attachments: list[str] = []
         self._on_text_changed: Optional[Callable[[], None]] = None
+        self._save_after_id: Optional[str] = None
         self._build_ui()
+        # 启动加载上次保存的模板（全局不分账户；无存档用默认示例）
+        self.set_message(load_template())
 
     def _build_ui(self):
         # === 消息模板标题 ===
@@ -49,10 +53,7 @@ class MessageEditor(ttk.Frame):
         self._text.pack(side=tk.LEFT, fill=tk.X, expand=True)
         text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # 默认示例文本
-        self._text.insert("1.0", "[name]同学你好，\n\n这是本学期的课程安排。\n\n[name]=25级李华 [name2]=李华")
-
-        # 绑定事件更新变量提示
+        # 绑定事件更新变量提示 + 防抖保存（默认文本由 load_template 在 __init__ 注入）
         self._text.bind("<KeyRelease>", self._on_text_change)
 
         # 变量提示标签
@@ -168,6 +169,24 @@ class MessageEditor(ttk.Frame):
         self._update_var_hint()
         if self._on_text_changed:
             self._on_text_changed()
+        self._schedule_save()
+
+    def _schedule_save(self) -> None:
+        """输入防抖：600ms 无输入后落盘，避免每个按键都写文件"""
+        if self._save_after_id is not None:
+            self.after_cancel(self._save_after_id)
+        self._save_after_id = self.after(600, self._flush_template)
+
+    def _flush_template(self) -> None:
+        self._save_after_id = None
+        save_template(self.get_message())
+
+    def flush(self) -> None:
+        """立即保存模板（取消未落盘的防抖任务）。发送前调用保证发送内容已存档。"""
+        if self._save_after_id is not None:
+            self.after_cancel(self._save_after_id)
+            self._save_after_id = None
+        save_template(self.get_message())
 
     def _update_var_hint(self):
         from src.services.template_engine import TemplateEngine

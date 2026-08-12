@@ -15,6 +15,7 @@ from src.utils.coordinates import (
 )
 from src.utils.settings_store import (
     DEFAULT_SETTINGS,
+    copy_account_data,
     load_account_settings,
     load_delay_settings,
     load_scan_settings,
@@ -106,11 +107,15 @@ class SettingsDialog(tk.Toplevel):
         acct_row = ttk.Frame(self)
         acct_row.pack(fill=tk.X, padx=8, pady=(8, 0))
         names = self._account_names or ([self._account_name] if self._account_name else ["默认账户"])
+        self._display_account = self._account_name or names[0]
         self._account_combo = ttk.Combobox(
             acct_row, values=names, state="readonly", width=12)
-        self._account_combo.set(self._account_name or names[0])
+        self._account_combo.set(self._display_account)
         self._account_combo.bind("<<ComboboxSelected>>", self._on_account_selected)
         self._account_combo.pack(side=tk.LEFT, padx=(6, 0))
+        # 同步其他账户设置：按钮 → 选来源账户 → 单次复制坐标+OCR校准，之后不跟随
+        ttk.Button(acct_row, text="同步其他账户设置(坐标/OCR)",
+                   command=self._on_sync_settings).pack(side=tk.LEFT, padx=(12, 0))
 
         nb = ttk.Notebook(self)
         self._nb = nb
@@ -309,6 +314,71 @@ class SettingsDialog(tk.Toplevel):
         self._on_close()  # 保存当前账户并关闭
         SettingsDialog(self._parent, tab=tab_name,
                        account_name=new, account_names=self._account_names)
+
+    def _on_sync_settings(self) -> None:
+        """「同步其他账户设置(坐标/OCR)」：选来源账户 → 单次复制坐标+OCR校准，之后不跟随"""
+        others = [n for n in (self._account_names or []) if n != self._display_account]
+        if not others:
+            messagebox.showinfo("提示", "没有其他账户可选用。")
+            return
+        source = self._pick_inherit_source(others)
+        if not source:
+            return
+        copied_coords, copied_calib = copy_account_data(source, self._display_account)
+        if not copied_coords and not copied_calib:
+            messagebox.showwarning(
+                "提示", f"来源账户「{source}」没有已保存的坐标/OCR 校准，无内容可复制。")
+            return
+        parts = [p for p, ok in (("坐标", copied_coords), ("OCR 校准", copied_calib)) if ok]
+        messagebox.showinfo(
+            "已同步",
+            f"已从「{source}」同步 {'、'.join(parts)} 到当前账户。\n之后各自独立，不再跟随。")
+        self._refresh_coord_vars_from_disk()
+
+    def _pick_inherit_source(self, others: list[str]) -> Optional[str]:
+        """弹选择框：选一个来源账户（其坐标/OCR校准将复制到当前账户）"""
+        dlg = tk.Toplevel(self)
+        dlg.title("选择来源账户")
+        dlg.resizable(False, False)
+        dlg.transient(self)
+        dlg.grab_set()
+        var = tk.StringVar(value=others[0])
+        ttk.Label(dlg, text="从哪个账户复制坐标和 OCR 校准？").pack(padx=16, pady=(14, 6))
+        combo = ttk.Combobox(dlg, textvariable=var, values=others,
+                             state="readonly", width=16)
+        combo.pack(padx=16, pady=4)
+        result: list[Optional[str]] = [None]
+
+        def _ok():
+            result[0] = var.get()
+            dlg.destroy()
+
+        btn = ttk.Frame(dlg)
+        btn.pack(pady=(6, 12))
+        ttk.Button(btn, text="确定", command=_ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn, text="取消", command=dlg.destroy).pack(side=tk.LEFT, padx=4)
+        combo.bind("<Return>", lambda e: _ok())
+        dlg.update_idletasks()
+        try:
+            pw, ph = self.winfo_width(), self.winfo_height()
+            px, py = self.winfo_rootx(), self.winfo_rooty()
+            w, h = dlg.winfo_reqwidth(), dlg.winfo_reqheight()
+            dlg.geometry(f"+{px + (pw - w) // 2}+{py + (ph - h) // 2}")
+        except Exception:
+            pass
+        dlg.wait_window()
+        return result[0]
+
+    def _refresh_coord_vars_from_disk(self) -> None:
+        """复制后把坐标页输入框刷新为落盘值（若坐标页已构建）"""
+        if not self._coord_vars:
+            return
+        from src.utils.coordinates import load_coordinates
+        coords = load_coordinates(self._display_account)
+        for key, (xv, yv) in self._coord_vars.items():
+            if key in coords:
+                xv.set(f"{coords[key][0]:.4f}")
+                yv.set(f"{coords[key][1]:.4f}")
 
     def _on_logging_toggled(self) -> None:
         from src.utils.logger import set_file_logging

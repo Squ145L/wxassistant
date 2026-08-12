@@ -236,16 +236,20 @@ class FriendList(ttk.Frame):
         self._regex_hint.config(text=text, foreground="#2196F3")
 
     def clear_filter(self) -> None:
-        """清空筛选 + 恢复浅色占位符（账户切换时调用，防串账户）"""
-        self._placeholder_active = True
-        self._filter_var.set("")
-        self._filter_entry.delete(0, tk.END)
-        self._filter_entry.insert(0, self._placeholder_text)
-        self._filter_entry.config(foreground="gray")
+        """清空筛选 + 恢复浅色占位符（点✕/账户切换时调用，防串账户）"""
+        # 先清标签/正则/提示，再触发筛选刷新，最后恢复占位符
         self._regex_mode.set(False)
         self._tag_var.set("选择标签")
         self.set_regex_error("")
         self.set_regex_hint("")
+        # 关键：set(_filter_var) 会触发 <<FilterChanged>> 刷新列表。必须先取消
+        # 占位符状态再 set，否则 _on_filter_var_changed 因占位符提前 return，列表不刷新。
+        self._placeholder_active = False
+        self._filter_var.set("")
+        self._filter_entry.delete(0, tk.END)
+        self._placeholder_active = True
+        self._filter_entry.insert(0, self._placeholder_text)
+        self._filter_entry.config(foreground="gray")
 
     def _on_filter_var_changed(self, *_args) -> None:
         """搜索/正则变化 → 提示更新 + 触发外部重筛（<<FilterChanged>>）"""
@@ -339,6 +343,10 @@ class FriendList(ttk.Frame):
     # ================================================================
 
     def _populate_tree(self):
+        # 重命名进行中 → 先取消内联编辑框（它挂在 tree 上而非树行，delete 不会带走它），
+        # 否则列表刷新后输入框残留、且 <Button-1> 还停留在提交重命名的绑定上
+        if self._rename_entry is not None:
+            self._rename_cancel()
         self._tree.delete(*self._tree.get_children())
         for f in self._friends:
             name = f.name
@@ -503,6 +511,7 @@ class FriendList(ttk.Frame):
         self._tree.unbind("<Button-1>")
         self._tree.bind("<Button-1>", self._on_tree_click)
         self._rename_entry = None
+        self._rename_iid = None
         if new and new != old and self._on_rename:
             self._on_rename(old, new)
 
@@ -514,6 +523,7 @@ class FriendList(ttk.Frame):
         self._tree.unbind("<Button-1>")
         self._tree.bind("<Button-1>", self._on_tree_click)
         self._rename_entry = None
+        self._rename_iid = None
 
     def _batch_set_tag(self):
         """为勾选的联系人批量设置标签"""
