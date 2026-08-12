@@ -25,9 +25,19 @@ logger = logging.getLogger(__name__)
 # 群发回调
 # ================================================================
 
+def _wait_if_paused(pause_event, stop_event) -> None:
+    """暂停时阻塞等待（可被终止唤醒）。pause_event 为 None（未启用暂停）时直接返回。"""
+    if pause_event is None:
+        return
+    while not pause_event.is_set():
+        if stop_event.is_set():
+            return
+        time.sleep(0.1)
+
+
 def _send_friends(bridge, friends: list, message_template: str, attachments: list[str],
                   interval: float, regex_pattern: str,
-                  progress_queue: queue.Queue, stop_event,
+                  progress_queue: queue.Queue, stop_event, pause_event,
                   template_engine, send_service):
     """单账户发送核心：遍历好友 → 渲染 → 搜索 → OCR 验证 → 发送。返回 send_batch 结果。"""
     compiled_regex = None
@@ -38,6 +48,7 @@ def _send_friends(bridge, friends: list, message_template: str, attachments: lis
             pass
 
     bridge.set_stop_check(lambda: stop_event.is_set())
+    bridge.set_pause_check(lambda: _wait_if_paused(pause_event, stop_event))
 
     def _stopped():
         return stop_event.is_set()
@@ -60,6 +71,7 @@ def _send_friends(bridge, friends: list, message_template: str, attachments: lis
 
             if _stopped():
                 return SendResult(friend_name=name, success=False, error="已中断")
+            _wait_if_paused(pause_event, stop_event)   # 搜索完成 → 暂停则等待（不截图/OCR）
 
             matched, _ = bridge.match_chat_title(name)
             if not matched:
@@ -67,6 +79,7 @@ def _send_friends(bridge, friends: list, message_template: str, attachments: lis
 
             if _stopped():
                 return SendResult(friend_name=name, success=False, error="已中断")
+            _wait_if_paused(pause_event, stop_event)   # OCR 完成 → 暂停则等待（不发送消息）
 
             if rendered.strip():
                 bridge.send_text_message(rendered)
@@ -93,13 +106,14 @@ def _send_friends(bridge, friends: list, message_template: str, attachments: lis
         ))
 
     send_service._stop_event = stop_event
+    send_service._pause_event = pause_event
     send_service.base_interval = interval
     batch = send_service.send_batch(friends=friends, send_one=send_one, on_progress=on_progress)
     send_service.reset()
     return batch
 
 
-def make_send_callback(get_bridge, template_engine, send_service):
+def make_send_callback(get_bridge, template_engine, send_service, pause_event):
     """创建群发后台回调（get_bridge: 可调用，返回当前账户的 WeChatBridge）"""
 
     def do_send(
@@ -109,14 +123,14 @@ def make_send_callback(get_bridge, template_engine, send_service):
     ):
         bridge = get_bridge()
         batch = _send_friends(bridge, friends, message_template, attachments,
-                              interval, regex_pattern, progress_queue, stop_event,
+                              interval, regex_pattern, progress_queue, stop_event, pause_event,
                               template_engine, send_service)
         progress_queue.put(("__DONE__", batch.success, batch.failed, batch.failed_list, batch.results))
 
     return do_send
 
 
-def make_pipeline_send_callback(get_runtime, template_engine, send_service):
+def make_pipeline_send_callback(get_runtime, template_engine, send_service, pause_event):
     """多账户流水线并发发送。
 
     每账户一条线程；全局前台锁保证同一时刻只有一个窗口做前台操作
@@ -175,6 +189,7 @@ def make_pipeline_send_callback(get_runtime, template_engine, send_service):
             for friend in friends:
                 if _stopped():
                     return
+                _wait_if_paused(pause_event, stop_event)   # 暂停粒度 = 好友边界
                 name = friend.name
                 try:
                     regex_match = compiled_regex.search(name) if compiled_regex else None
@@ -227,6 +242,7 @@ def make_pipeline_send_callback(get_runtime, template_engine, send_service):
                 continue
             bridge, _fs = item
             bridge.set_stop_check(lambda: stop_event.is_set())   # 前台搜索段可响应中断
+            bridge.set_pause_check(lambda: _wait_if_paused(pause_event, stop_event))
             threads.append(threading.Thread(target=worker, args=(bridge, friends), daemon=True))
 
         for t in threads:
@@ -246,39 +262,41 @@ def make_pipeline_send_callback(get_runtime, template_engine, send_service):
 # 检查联系人名字回调
 # ================================================================
 
-def make_check_names_callback(get_bridge, friend_service):
+def make_check_names_callback(get_bridge, friend_service, pause_event):
     """检查选中好友名称是否完整（get_bridge: 返回当前账户 WeChatBridge）"""
 
     def do_check(friends: list, progress_queue: queue.Queue, stop_event):
         try:
             bridge = get_bridge()
             bridge.set_stop_check(lambda: stop_event.is_set())
+            bridge.set_pause_check(lambda: _wait_if_paused(pause_event, stop_event))
             diffs: dict[str, str] = {}
             failed: dict[str, str] = {}
 
             for friend in friends:
                 if stop_event.is_set():
-                    progress_queue.put(("__LOG__", "已中断"))
+                    logger.info("已中断")
                     break
+                _wait_if_paused(pause_event, stop_event)   # 暂停粒度 = 好友边界
                 name = friend.name
                 try:
                     found = bridge.search_contacts(name)
                     if not found:
                         if not stop_event.is_set():
-                            logger.info("检查名字: '%s' — 搜不到", name)
+                            logger.warning("⚠ 检查名字: '%s' — 搜不到", name)
                             failed[name] = "搜索失败"
                         continue
 
                     matched, ocr_name = bridge.match_chat_title(name)
                     if matched and ocr_name and ocr_name != name:
-                        logger.info("检查名字: '%s' -> '%s'", name, ocr_name)
+                        logger.info("✅ 检查名字: '%s' -> '%s'", name, ocr_name)
                         diffs[name] = ocr_name
                         failed[name] = f"'{ocr_name}' (expected='{name}')"
                     elif not matched:
-                        logger.info("检查名字: '%s' — OCR 不匹配 '%s'", name, ocr_name)
+                        logger.warning("⚠ 检查名字: '%s' — OCR 不匹配 '%s'", name, ocr_name)
                         failed[name] = f"'{ocr_name}' (expected='{name}')"
                     else:
-                        logger.info("检查名字: '%s' — 已完整", name)
+                        logger.info("✅ 检查名字: '%s' — 已完整", name)
 
                 except Exception as e:
                     logger.exception("检查名字异常: '%s'", name)
@@ -306,7 +324,7 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
 
     hwnd = bridge.open_contacts_manager()
     if hwnd is None:
-        progress_queue.put(("__LOG__", "❌ 未找到通讯录管理窗口"))
+        logger.warning("❌ 未找到通讯录管理窗口")
         return []
 
     rect = win32gui.GetWindowRect(hwnd)
@@ -354,10 +372,10 @@ def _capture_contacts_manager(bridge, progress_queue, stop_event, keyword: str =
     paths = []
     for page in range(page_count):
         if stop_event.is_set():
-            progress_queue.put(("__LOG__", "已中断"))
+            logger.info("已中断")
             break
         progress_queue.put(("__PROGRESS__", page + 1, page_count, 0, 0, "", None))
-        progress_queue.put(("__LOG__", f"截图第 {page + 1}/{page_count} 页..."))
+        logger.info("截图第 %d/%d 页...", page + 1, page_count)
 
         img = bridge.screenshot_region(x1, y1, x2, y2)
         if img:
@@ -389,7 +407,7 @@ def _ocr_pages(paths: list[str], progress_queue, stop_event) -> list[str]:
 
     for i, path in enumerate(paths):
         if stop_event and stop_event.is_set():
-            progress_queue.put(("__LOG__", f"OCR已中断，保留已扫描 {len(all_names)} 人"))
+            logger.warning("⚠ OCR已中断，保留已扫描 %d 人", len(all_names))
             break
         try:
             progress_queue.put(("__PROGRESS__", i + 1, len(paths), 0, 0, "", None))
@@ -398,22 +416,22 @@ def _ocr_pages(paths: list[str], progress_queue, stop_event) -> list[str]:
             names = [t for t in ocr.recognize_text(img) if 2 <= len(t) <= 20 and not t.isdigit()]
             new_in_page = [n for n in names if n not in all_names]
             all_names.extend(new_in_page)
-            progress_queue.put(("__LOG__", f"OCR第{i + 1}页: +{len(new_in_page)}人 (累计{len(all_names)})"))
+            logger.info("OCR第%d页: +%d人 (累计%d)", i + 1, len(new_in_page), len(all_names))
 
             if not new_in_page:
                 same_count += 1
                 if same_count >= 3:
-                    progress_queue.put(("__LOG__", "连续3页无新联系人，OCR完成"))
+                    logger.info("✅ 连续3页无新联系人，OCR完成")
                     break
             else:
                 same_count = 0
         except Exception as e:
-            progress_queue.put(("__LOG__", f"OCR第{i + 1}页失败: {e}"))
+            logger.warning("⚠ OCR第%d页失败: %s", i + 1, e)
 
     return list(dict.fromkeys(all_names))
 
 
-def _save_debug_screenshots(paths: list[str], progress_queue) -> None:
+def _save_debug_screenshots(paths: list[str]) -> None:
     """复制 OCR 截图到 debug_scan 目录供用户检查"""
     import shutil as _shutil
     debug_dir = "cache/debug_scan"
@@ -423,20 +441,20 @@ def _save_debug_screenshots(paths: list[str], progress_queue) -> None:
         _os.makedirs(debug_dir, exist_ok=True)
         for p in paths:
             _shutil.copy2(p, debug_dir)
-        progress_queue.put(("__LOG__", f"调试截图已保存到 {debug_dir}/ ({len(paths)} 张)"))
+        logger.info("✅ 调试截图已保存到 %s/ (%d 张)", debug_dir, len(paths))
     except Exception as e:
-        progress_queue.put(("__LOG__", f"调试截图保存失败: {e}"))
+        logger.warning("⚠ 调试截图保存失败: %s", e)
 
 
-def _cleanup_temp_scan(progress_queue) -> None:
+def _cleanup_temp_scan() -> None:
     """清空临时截图目录"""
     import os as _os
     import shutil as _shutil
     temp_dir = "cache/temp_scan"
     try:
         _shutil.rmtree(temp_dir, ignore_errors=True)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("清理临时截图失败: %s", e)
 
 
 # ================================================================
@@ -452,7 +470,7 @@ def make_search_contacts_callback(get_bridge, friend_service):
         try:
             # 阶段1: 截图（鼠标中断可触发）
             paths = _capture_contacts_manager(bridge, progress_queue, stop_event, keyword)
-            progress_queue.put(("__LOG__", f"扫描完成 {len(paths)} 页，正在后台 OCR..."))
+            logger.info("扫描完成 %d 页，正在后台 OCR...", len(paths))
             progress_queue.put(("__SCAN_DONE_FOCUS__", len(paths)))
             if not paths:
                 progress_queue.put(("__INTERRUPT_OFF__", None))
@@ -470,19 +488,19 @@ def make_search_contacts_callback(get_bridge, friend_service):
             # OCR 调试截图：根据设置决定是否保留一份副本
             from src.utils.settings_store import load_settings
             if load_settings().get("ocr_debug_save", False):
-                _save_debug_screenshots(paths, progress_queue)
+                _save_debug_screenshots(paths)
             # temp_scan 是临时目录，无论如何都清掉
-            _cleanup_temp_scan(progress_queue)
+            _cleanup_temp_scan()
 
             # 阶段3: 弹确认窗
             if names:
                 progress_queue.put(("__IMPORT_CONFIRM__", names))
             progress_queue.put(("__NAME_CHECK_DONE__", {}, {}))
-            progress_queue.put(("__LOG__", f"共 {len(names)} 个联系人"))
+            logger.info("✅ 共 %d 个联系人", len(names))
 
         except Exception as e:
             logger.exception("操作异常")
-            progress_queue.put(("__LOG__", f"❌ 错误: {e}"))
+            logger.error("❌ 错误: %s", e)
             progress_queue.put(("__NAME_CHECK_DONE__", {}, {}))
 
     return do_search

@@ -8,40 +8,22 @@ from src.ui import ui_kit
 
 
 class SendProgress(ttk.Frame):
-    """底部进度条区域（浅色背景块）
+    """底部控制区（浅色背景块）
 
-    包含：进度条、统计标签（X/Y ✅X ❌Y）、开始/终止按钮、状态标签、日志文本框
+    布局自上而下：开始/终止按钮行（含统计/状态）→ 进度条 → 日志文本框。
     """
 
     def __init__(self, parent: tk.Widget):
         super().__init__(parent, style="Block.TFrame", padding=ui_kit.PAD_M)
         self._on_start: Optional[Callable[[], None]] = None
         self._on_stop: Optional[Callable[[], None]] = None
+        self._running: bool = False   # 是否处于运行态（供 set_paused 恢复按钮文案）
         self._build_ui()
 
     def _build_ui(self):
-        # === 进度条 ===
-        bar_frame = ttk.Frame(self)
-        bar_frame.pack(fill=tk.X, pady=(0, ui_kit.PAD_S))
-
-        self._progress = ttk.Progressbar(
-            bar_frame,
-            mode="determinate",
-            maximum=100,
-        )
-        self._progress.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        self._progress_label = ttk.Label(
-            bar_frame,
-            text="0/0",
-            width=8,
-            anchor=tk.CENTER,
-        )
-        self._progress_label.pack(side=tk.RIGHT, padx=(ui_kit.PAD_M, 0))
-
-        # === 统计 + 按钮行 ===
+        # === 统计 + 按钮行（置顶）===
         ctrl_frame = ttk.Frame(self)
-        ctrl_frame.pack(fill=tk.X, pady=ui_kit.PAD_XS)
+        ctrl_frame.pack(fill=tk.X, pady=(0, ui_kit.PAD_XS))
 
         # 统计标签
         stats = ttk.Frame(ctrl_frame)
@@ -65,7 +47,7 @@ class SendProgress(ttk.Frame):
         # 弹性区：统计/状态 与 按钮 之间，防折叠（布局铁律 1）
         ui_kit.Spacer(ctrl_frame).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        # 按钮
+        # 按钮（开始群发 最右，终止 在左）
         btn_frame = ttk.Frame(ctrl_frame)
         btn_frame.pack(side=tk.RIGHT)
 
@@ -81,6 +63,25 @@ class SendProgress(ttk.Frame):
             command=self._on_start_clicked,
         )
         self._btn_start.pack(side=tk.RIGHT)
+
+        # === 进度条（在开始群发按钮下方）===
+        bar_frame = ttk.Frame(self)
+        bar_frame.pack(fill=tk.X, pady=(ui_kit.PAD_XS, ui_kit.PAD_S))
+
+        self._progress = ttk.Progressbar(
+            bar_frame,
+            mode="determinate",
+            maximum=100,
+        )
+        self._progress.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        self._progress_label = ttk.Label(
+            bar_frame,
+            text="0/0",
+            width=8,
+            anchor=tk.CENTER,
+        )
+        self._progress_label.pack(side=tk.RIGHT, padx=(ui_kit.PAD_M, 0))
 
         # === 日志面板 ===
         log_frame = ttk.LabelFrame(self, text="发送日志", padding=ui_kit.PAD_S)
@@ -113,6 +114,7 @@ class SendProgress(ttk.Frame):
 
     def set_running(self, running: bool):
         """切换运行/就绪状态"""
+        self._running = running
         if running:
             self._btn_start.config(state=tk.DISABLED)
             self._btn_stop.config(state=tk.NORMAL)
@@ -121,6 +123,22 @@ class SendProgress(ttk.Frame):
             self._btn_start.config(state=tk.NORMAL)
             self._btn_stop.config(state=tk.DISABLED)
             self._status_var.set("就绪")
+
+    def set_paused(self, paused: bool):
+        """暂停/恢复状态：暂停时开始钮变「▶ 继续」且可点；恢复后按 _running 回位。"""
+        if paused:
+            self._btn_start.config(text="▶ 继续", state=tk.NORMAL)
+            self._status_var.set("已暂停")
+        elif self._running:
+            self._btn_start.config(text="▶ 开始群发", state=tk.DISABLED)
+            self._status_var.set("发送中...")
+        else:
+            self._btn_start.config(text="▶ 开始群发", state=tk.NORMAL)
+            self._status_var.set("就绪")
+
+    def set_terminate_available(self, available: bool):
+        """只开关 ⏹ 终止按钮（名字检查等不改状态字的流程用）"""
+        self._btn_stop.config(state=tk.NORMAL if available else tk.DISABLED)
 
     def update_progress(self, current: int, total: int):
         """更新进度条"""
@@ -153,12 +171,13 @@ class SendProgress(ttk.Frame):
 
     def reset(self):
         """重置所有状态"""
+        self._running = False
         self._progress.config(value=0)
         self._progress_label.config(text="0/0")
         self._label_success.config(text="✅ 0")
         self._label_failed.config(text="❌ 0")
         self._status_var.set("就绪")
-        self._btn_start.config(state=tk.NORMAL)
+        self._btn_start.config(text="▶ 开始群发", state=tk.NORMAL)
         self._btn_stop.config(state=tk.DISABLED)
 
     # ================================================================

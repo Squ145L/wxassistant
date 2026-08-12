@@ -52,6 +52,8 @@ class SendService:
         self.base_interval = base_interval if base_interval is not None else _d["op_send_interval"]
         self.jitter_ratio = jitter_ratio if jitter_ratio is not None else _d["op_send_jitter"]
         self._stop_event = threading.Event()
+        self._pause_event = threading.Event()   # 暂停：set()=不暂停，clear()=暂停（由 operations 注入共享实例）
+        self._pause_event.set()
         self._is_running = False
 
     # ================================================================
@@ -68,8 +70,9 @@ class SendService:
         self._stop_event.set()
 
     def reset(self):
-        """重置终止标志，准备下次发送"""
+        """重置终止/暂停标志，准备下次发送"""
         self._stop_event.clear()
+        self._pause_event.set()
         self._is_running = False
 
     def send_batch(
@@ -99,6 +102,8 @@ class SendService:
             if self._stop_event.is_set():
                 logger.info("群发已终止: 完成 %d/%d", i, len(friends))
                 break
+            # --- 暂停等待（暂停粒度 = 好友边界）---
+            self._wait_if_paused()
 
             # --- 发送 ---
             display = getattr(friend, "display_name", str(friend))
@@ -145,12 +150,23 @@ class SendService:
         return max(0.03, delay)  # 最短不低于 0.03 秒
 
     def _interruptible_sleep(self, total_seconds: float):
-        """分段睡眠，每 0.1s 检查一次终止信号"""
+        """分段睡眠，每 0.1s 检查一次终止/暂停信号"""
         chunk = 0.1
         elapsed = 0.0
         while elapsed < total_seconds:
             if self._stop_event.is_set():
                 return
+            self._wait_if_paused()
             sleep_time = min(chunk, total_seconds - elapsed)
             time.sleep(sleep_time)
             elapsed += sleep_time
+
+    def _wait_if_paused(self):
+        """暂停时阻塞等待（可被终止唤醒）。pause_event 未注入时直接返回。"""
+        pause = self._pause_event
+        if pause is None:
+            return
+        while not pause.is_set():
+            if self._stop_event.is_set():
+                return
+            time.sleep(0.1)

@@ -96,6 +96,11 @@ class SettingsDialog(tk.Toplevel):
         _ocr_value = self._settings.get("ocr_model", "v5")
         self._ocr_model = tk.StringVar(value=OCR_MODELS.get(_ocr_value, OCR_MODELS["v5"]))
 
+        # 按键中断（设置→常规，全局；仅发送 + 名字检查生效，扫描/导入固定终止）
+        self._interrupt_trigger = tk.StringVar(value=self._settings.get("interrupt_trigger", "any"))
+        self._interrupt_key = tk.StringVar(value=self._settings.get("interrupt_key") or "")
+        self._interrupt_mode = tk.StringVar(value=self._settings.get("interrupt_mode", "terminate"))
+
         # 坐标变量（延迟加载，从 coordinates.py）
         self._coord_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
 
@@ -121,18 +126,42 @@ class SettingsDialog(tk.Toplevel):
         self._nb = nb
         nb.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-        # ---- 标签1: 常规 ----
+        # ---- 标签1: 常规（可滚动）----
         tab1 = ttk.Frame(nb, padding=16)
         nb.add(tab1, text="常规")
+        _cv1, _sb1, body, _bind1 = self._build_scroll_area(tab1)
 
-        ttk.Label(tab1, text="发送的 name 来源:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Radiobutton(tab1, text="缓存加载", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
-        ttk.Radiobutton(tab1, text="OCR 扫描  (扫描微信通讯录获取)", variable=self._name_source, value="ocr").pack(anchor=tk.W, pady=2)
+        # ---- 按键中断（仅发送 + 名字检查生效）----
+        ttk.Label(body, text="按键中断:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W)
+        ttk.Radiobutton(body, text="任意键中断", variable=self._interrupt_trigger, value="any",
+                        command=self._on_interrupt_trigger_change).pack(anchor=tk.W, pady=(6, 0))
+        ttk.Radiobutton(body, text="指定按键中断", variable=self._interrupt_trigger, value="specific",
+                        command=self._on_interrupt_trigger_change).pack(anchor=tk.W)
+        key_row = ttk.Frame(body)
+        key_row.pack(fill=tk.X, pady=(2, 0))
+        ttk.Label(key_row, text="绑定按键:").pack(side=tk.LEFT)
+        self._key_entry = ttk.Entry(key_row, textvariable=self._interrupt_key,
+                                    width=8, state="disabled")
+        self._key_entry.pack(side=tk.LEFT, padx=(4, 0))
+        ttk.Label(key_row, text="点击输入框后按下要绑定的键",
+                  foreground="gray", font=("", 8)).pack(side=tk.LEFT, padx=(6, 0))
+        self._key_entry.bind("<Key>", self._on_capture_key)
+        ttk.Label(body, text="用途（仅发送 + 检查名称完整生效）：",
+                  foreground="gray", font=("", 8)).pack(anchor=tk.W, pady=(6, 0))
+        ttk.Radiobutton(body, text="用于 终止", variable=self._interrupt_mode,
+                        value="terminate").pack(anchor=tk.W)
+        ttk.Radiobutton(body, text="用于 暂停", variable=self._interrupt_mode,
+                        value="pause").pack(anchor=tk.W)
+        ttk.Separator(body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
 
-        ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+        ttk.Label(body, text="发送的 name 来源:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Radiobutton(body, text="缓存加载", variable=self._name_source, value="cache").pack(anchor=tk.W, pady=2)
+        ttk.Radiobutton(body, text="OCR 扫描  (扫描微信通讯录获取)", variable=self._name_source, value="ocr").pack(anchor=tk.W, pady=2)
 
-        ttk.Label(tab1, text="界面主题:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
-        theme_row = ttk.Frame(tab1)
+        ttk.Separator(body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+
+        ttk.Label(body, text="界面主题:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        theme_row = ttk.Frame(body)
         theme_row.pack(fill=tk.X)
         from src.ui import ui_kit
         theme_combo = ui_kit.make_combo(theme_row, ["vista", "clam", "alt", "xpnative"], width=10)
@@ -141,14 +170,16 @@ class SettingsDialog(tk.Toplevel):
         theme_combo.pack(side=tk.LEFT)
         ttk.Label(theme_row, text="（即时切换整界面配色）", foreground="gray").pack(side=tk.LEFT, padx=ui_kit.PAD_S)
 
-        ttk.Separator(tab1, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+        ttk.Separator(body, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
 
-        ttk.Label(tab1, text="日志:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
-        log_row = ttk.Frame(tab1)
+        ttk.Label(body, text="日志:", font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
+        log_row = ttk.Frame(body)
         log_row.pack(fill=tk.X)
         ttk.Checkbutton(log_row, text="启用文件日志 (logs/app.log)", variable=self._logging_enabled,
                         command=self._on_logging_toggled).pack(side=tk.LEFT)
         ttk.Button(log_row, text="清除日志", command=self._on_clear_logs).pack(side=tk.RIGHT)
+
+        _bind1(body)
 
         # ---- 标签2: OCR ----
         tab2 = ttk.Frame(nb, padding=16)
@@ -292,6 +323,10 @@ class SettingsDialog(tk.Toplevel):
         _label = self._ocr_model.get()
         self._settings["ocr_model"] = next(
             (k for k, v in OCR_MODELS.items() if v == _label), "v5")
+        # 按键中断（全局设置）
+        self._settings["interrupt_trigger"] = self._interrupt_trigger.get()
+        self._settings["interrupt_key"] = self._interrupt_key.get().strip() or None
+        self._settings["interrupt_mode"] = self._interrupt_mode.get()
         save_settings(self._settings)
         # name_source 是账户级设置
         save_account_settings(self._account_name or "",
@@ -303,6 +338,18 @@ class SettingsDialog(tk.Toplevel):
         """即时切换 ttk 主题（theme_use 后重配命名样式）"""
         from src.ui import ui_kit
         ui_kit.configure_style(self._parent, self._theme_var.get())
+
+    def _on_interrupt_trigger_change(self, _event=None) -> None:
+        """触发方式切换：specific 时启用按键捕获框"""
+        state = "normal" if self._interrupt_trigger.get() == "specific" else "disabled"
+        self._key_entry.config(state=state)
+
+    def _on_capture_key(self, event) -> str:
+        """按键捕获：在输入框聚焦时按下任意键，取其 keysym 作为绑定键"""
+        keysym = getattr(event, "keysym", "")
+        if keysym:
+            self._interrupt_key.set(keysym)
+        return "break"   # 吃掉按键，阻止其它处理
 
     def _on_account_selected(self, _event=None) -> None:
         """设置弹窗内切换账户：保存当前账户 → 重开对应账户的设置"""

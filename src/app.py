@@ -164,9 +164,11 @@ def _build_window(multi_session=None):
         window.set_account_runtime(runtime)
 
         window.set_send_callback(
-            make_send_callback(window.get_current_bridge, template_engine, send_service))
+            make_send_callback(window.get_current_bridge, template_engine, send_service,
+                               window._pause_event))
         window.set_check_names_callback(
-            make_check_names_callback(window.get_current_bridge, window.get_current_friend_service))
+            make_check_names_callback(window.get_current_bridge, window.get_current_friend_service,
+                                      window._pause_event))
         window.set_search_contacts_callback(
             make_search_contacts_callback(window.get_current_bridge, window.get_current_friend_service))
         window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))
@@ -193,9 +195,11 @@ def _build_window(multi_session=None):
     window.set_account_runtime(runtime)
 
     window.set_send_callback(
-        make_pipeline_send_callback(window.get_account_runtime, template_engine, send_service))
+        make_pipeline_send_callback(window.get_account_runtime, template_engine, send_service,
+                                    window._pause_event))
     window.set_check_names_callback(
-        make_check_names_callback(window.get_current_bridge, window.get_current_friend_service))
+        make_check_names_callback(window.get_current_bridge, window.get_current_friend_service,
+                                  window._pause_event))
     window.set_search_contacts_callback(
         make_search_contacts_callback(window.get_current_bridge, window.get_current_friend_service))
     window.set_enter_multiopen_callback(lambda w=window: _enter_multiopen(w))

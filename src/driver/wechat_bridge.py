@@ -44,6 +44,7 @@ class WeChatBridge:
     def __init__(self):
         self._hwnd: Optional[int] = None
         self._stop_check = None
+        self._pause_check = None   # 暂停检查：暂停时阻塞等待恢复/终止（防暂停后继续发按键）
         self._hook_suspend = None
         self._hook_resume = None
         self._excluded_hwnds: set[int] = set()
@@ -61,6 +62,10 @@ class WeChatBridge:
 
     def set_stop_check(self, checker):
         self._stop_check = checker
+
+    def set_pause_check(self, checker):
+        """注入暂停检查（阻塞式）：暂停时不在发送任何模拟按键，恢复/终止后继续"""
+        self._pause_check = checker
 
     def set_hook_control(self, suspend_fn, resume_fn):
         """注入钩子开关：SendKeys 前暂停钩子，之后恢复"""
@@ -248,6 +253,11 @@ class WeChatBridge:
         if self._should_stop():
             logger.info("SendKeys 已中断，跳过: %s", keys)
             return
+        # 暂停时阻塞：暂停后不再发送按键，恢复/终止后继续
+        if self._pause_check:
+            self._pause_check()
+        if self._should_stop():
+            return
         # 暂停中断钩子（模拟按键会触发 WH_KEYBOARD_LL）
         if self._hook_suspend:
             self._hook_suspend()
@@ -276,6 +286,10 @@ class WeChatBridge:
 
     def click_at(self, x: int, y: int):
         """鼠标左键单击（暂停钩子防自触发）"""
+        if self._pause_check:
+            self._pause_check()
+        if self._should_stop():
+            return
         if self._hook_suspend: self._hook_suspend()
         logger.info("click_at: (%d, %d)", x, y)
         win32api.SetCursorPos((x, y))
@@ -287,6 +301,10 @@ class WeChatBridge:
 
     def scroll_at(self, x: int, y: int, delta: int):
         """鼠标滚轮（暂停钩子防自触发）"""
+        if self._pause_check:
+            self._pause_check()
+        if self._should_stop():
+            return
         if self._hook_suspend: self._hook_suspend()
         try:
             win32api.SetCursorPos((x, y))

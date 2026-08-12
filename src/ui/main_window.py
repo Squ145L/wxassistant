@@ -53,15 +53,22 @@ class MainWindow:
         self._stop_event: Optional[threading.Event] = None
         self._interrupt_poll_active: bool = False
         self._busy: bool = False
+        self._pause_event: threading.Event = threading.Event()   # 暂停标志（set=不暂停）
+        self._pause_event.set()
+        self._paused: bool = False
+        self._interrupt_mode: str = "terminate"    # 本次操作的中断模式：terminate/pause
+        self._interrupt_vk: Optional[int] = None   # 绑定键 VK（None=任意键，钩子路径比对）
+        self._interrupt_keysym: Optional[str] = None  # 绑定键 keysym（tkinter 路径比对）
+        self._mouse_guard_until: float = 0.0   # 恢复后短暂屏蔽鼠标触发（防「继续」点击被当中断）
 
         self._build_ui()
         self._wire_events()
         self._poll_progress_queue()
 
-        # 任意键/鼠标点击中断（仅在操作进行中生效）
-        self.root.bind("<Key>", self._on_interrupt)
-        self.root.bind("<Button-1>", self._on_interrupt)
-        self.root.bind("<Button-3>", self._on_interrupt)
+        # 按键/鼠标中断（仅在操作进行中生效；specific 模式只认绑定键）
+        self.root.bind("<Key>", self._on_root_key)
+        self.root.bind("<Button-1>", self._on_root_click)
+        self.root.bind("<Button-3>", self._on_root_click)
 
         set_ui_callback(self._on_log_message)
         logger.info("主窗口初始化完成")
@@ -237,6 +244,10 @@ class MainWindow:
         )
         # 消息模板被修改 → 清除失败红字
         self.message_editor.set_on_text_changed(self.friend_list.clear_failed_marks)
+        # 文本输入框的绑定键拦截：操作进行中按绑定键 → 中断且不落字符进输入框
+        # （widget 层绑定先于 class 插入执行，return "break" 阻止字符输入）
+        self.friend_list._filter_entry.bind("<Key>", self._on_input_key, add="+")
+        self.message_editor._text.bind("<Key>", self._on_input_key, add="+")
 
     # ================================================================
     # 好友管理
@@ -468,12 +479,12 @@ class MainWindow:
             return False
         frames = bridge.find_all_windows()
         if not frames:
-            self.send_progress.append_log("❌ 未找到微信窗口，请先登录微信")
+            logger.warning("❌ 未找到微信窗口，请先登录微信")
             return False
         if len(frames) == 1:
             hwnd = frames[0][0]
             bridge._hwnd = hwnd
-            self.send_progress.append_log(f"✅ 已连接微信窗口: 0x{hwnd:X}")
+            logger.info("✅ 已连接微信窗口: 0x%X", hwnd)
             return True
         # 多个窗口 → 逐个确认
         for hwnd, title, _cls in frames:
@@ -483,11 +494,11 @@ class MainWindow:
                                  f"当前置顶的窗口是否为微信？\n\n标题: {title}",
                                  "是", "否(下一个)"):
                 bridge._hwnd = hwnd
-                self.send_progress.append_log(f"✅ 已锁定微信窗口: 0x{hwnd:X}（{title}）")
+                logger.info("✅ 已锁定微信窗口: 0x%X（%s）", hwnd, title)
                 return True
         # 全部否 → 兜底第一个
         bridge._hwnd = frames[0][0]
-        self.send_progress.append_log("⚠ 未确认窗口，默认使用第一个微信窗口")
+        logger.warning("⚠ 未确认窗口，默认使用第一个微信窗口")
         return True
 
     def _on_account_selected(self, _event=None) -> None:
@@ -525,7 +536,7 @@ class MainWindow:
             self._revert_account_combo()
             return
         save_accounts(names + [name])
-        logger.info("新建账户: %s", name)
+        logger.info("✅ 新建账户: %s", name)
         self._refresh_accounts(name)   # 重建运行时并选中新账户
 
     def _revert_account_combo(self) -> None:
@@ -588,10 +599,8 @@ class MainWindow:
         if not self._on_check_names:
             return
         self._set_busy(True)
-        self._stop_event = threading.Event()
-        self._interrupt_poll_active = True
-        self._was_interrupted = False
-        threading.Thread(target=self._interrupt_poll_loop, daemon=True).start()
+        self.send_progress.set_terminate_available(True)   # 名字检查启用 ⏹
+        self._start_interrupt_loop(True)
         self.send_progress.set_status("正在检查选中名称...")
         threading.Thread(target=self._on_check_names, args=(selected, self._progress_queue, self._stop_event), daemon=True).start()
 
@@ -607,12 +616,9 @@ class MainWindow:
         if not kw:
             return
         self.send_progress.set_status("正在搜索并导入...")
-        self.send_progress.append_log(f"搜索: '{kw}'")
+        logger.info("搜索: '%s'", kw)
         self._set_busy(True)
-        self._stop_event = threading.Event()
-        self._interrupt_poll_active = True
-        self._was_interrupted = False
-        threading.Thread(target=self._interrupt_poll_loop, daemon=True).start()
+        self._start_interrupt_loop(False)   # 扫描/导入固定终止
         threading.Thread(target=self._on_search_contacts,
                          args=(kw.strip(), self._progress_queue, self._stop_event),
                          daemon=True).start()
@@ -631,10 +637,7 @@ class MainWindow:
         self.send_progress.set_status("正在扫描通讯录...")
         self.send_progress.clear_log()
         self._set_busy(True)
-        self._stop_event = threading.Event()
-        self._interrupt_poll_active = True
-        self._was_interrupted = False
-        threading.Thread(target=self._interrupt_poll_loop, daemon=True).start()
+        self._start_interrupt_loop(False)   # 扫描/导入固定终止
         threading.Thread(target=self._on_search_contacts,
                          args=("", self._progress_queue, self._stop_event),
                          daemon=True).start()
@@ -767,6 +770,9 @@ class MainWindow:
         )
 
     def _on_start_send(self):
+        if self._paused:   # 「继续」按钮路由：暂停中点击 = 恢复
+            self._do_resume()
+            return
         if not self._ensure_not_busy():
             return
         if self._multi_session is not None:
@@ -810,10 +816,7 @@ class MainWindow:
         self._set_ui_sending(True)
         self.send_progress.clear_log()
 
-        self._stop_event = threading.Event()
-        self._interrupt_poll_active = True
-        self._was_interrupted = False
-        threading.Thread(target=self._interrupt_poll_loop, daemon=True).start()
+        self._start_interrupt_loop(True)
 
         if self._on_send:
             thread = threading.Thread(
@@ -824,8 +827,49 @@ class MainWindow:
             )
             thread.start()
 
-    def _on_interrupt(self, _event=None):
-        self._do_interrupt()
+    def _on_root_key(self, event):
+        """应用自身有焦点时的按键中断（tkinter 路径，比对 keysym）"""
+        self._dispatch_interrupt(keysym=getattr(event, "keysym", None))
+
+    def _on_root_click(self, _event=None):
+        """应用自身有焦点时的鼠标中断（specific 模式不响应）"""
+        self._dispatch_interrupt()
+
+    def _on_input_key(self, event) -> Optional[str]:
+        """文本输入框的绑定键拦截：操作进行中 + specific 匹配 → 中断并阻止字符落框。
+
+        widget 层绑定先于 class 插入执行，返回 "break" 可阻止字符输入。
+        """
+        if self._stop_event is not None and not self._stop_event.is_set():
+            if self._interrupt_vk is not None and getattr(event, "keysym", None) == self._interrupt_keysym:
+                self._dispatch_interrupt(keysym=event.keysym)
+                return "break"
+        return None
+
+    def _dispatch_interrupt(self, vk: Optional[int] = None, keysym: Optional[str] = None):
+        """统一中断分发：钩子路径传 vk，tkinter 路径传 keysym。
+
+        specific 模式先匹配绑定键；鼠标等无键源不响应；暂停中再按绑定键 = 无操作。
+        """
+        if self._stop_event is None or self._stop_event.is_set():
+            return
+        if vk is None and keysym is None and time.time() < self._mouse_guard_until:
+            return   # 恢复后短暂屏蔽鼠标触发，防「继续」按钮点击被当成中断
+        if self._interrupt_vk is not None:   # specific 模式：先匹配
+            if keysym is not None:
+                if keysym != self._interrupt_keysym:
+                    return
+            elif vk is not None:
+                if vk != self._interrupt_vk:
+                    return
+            else:
+                return   # 鼠标等无键源，specific 不响应
+        if self._interrupt_mode == "pause":
+            if self._paused:
+                return   # 暂停中再按绑定键 = 无操作（恢复只靠「继续」按钮）
+            self._do_pause()
+        else:
+            self._do_interrupt()
 
     def suspend_interrupt_hook(self):
         """SendKeys 前调用：暂停钩子避免模拟按键触发中断"""
@@ -836,17 +880,56 @@ class MainWindow:
         self._hook_suspended = False
 
     def _do_interrupt(self):
-        """触发中断 —— 不抢焦点，只设标志"""
+        """触发终止中断（terminate 模式 / 任意键中断）"""
         if self._stop_event and not self._stop_event.is_set():
             self._stop_event.set()
             self._interrupt_poll_active = False
             self._was_interrupted = True
-            self.send_progress.append_log("已中断")
             self.send_progress.set_status("已中断")
             logger.info("按键中断")
             messagebox.showinfo("已中断", "已按下按键中断")
             self.root.lift()
             self.root.focus_force()
+
+    def _do_pause(self):
+        """触发暂停（pause 模式）：清 pause_event 挡线程 + 弹窗反馈"""
+        if self._paused:
+            return
+        self._paused = True
+        self._pause_event.clear()
+        self.send_progress.set_paused(True)
+        logger.info("⏸ 已暂停")
+        messagebox.showinfo("已暂停", "已暂停，点击「▶ 继续」恢复")
+
+    def _do_resume(self):
+        """恢复发送（只由「▶ 继续」按钮触发，绑定键不 toggle）"""
+        if not self._paused:
+            return
+        self._paused = False
+        self._pause_event.set()
+        self._mouse_guard_until = time.time() + 0.5   # 短暂屏蔽鼠标触发，防「继续」点击被当中断
+        self.send_progress.set_paused(False)
+        logger.info("▶ 已恢复")
+
+    def _start_interrupt_loop(self, allow_pause: bool) -> None:
+        """统一启动中断钩子：操作开始前读一次设置快照，传给钩子线程。
+
+        allow_pause=False（扫描/导入）强制 terminate，忽略设置的 interrupt_mode。
+        """
+        from src.utils.settings_store import load_settings
+        from src.utils.keymap import keysym_to_vk
+        s = load_settings()
+        self._interrupt_mode = s.get("interrupt_mode", "terminate") if allow_pause else "terminate"
+        trigger = s.get("interrupt_trigger", "any")
+        key = s.get("interrupt_key") if trigger == "specific" else None
+        self._interrupt_vk = keysym_to_vk(key) if key else None
+        self._interrupt_keysym = key if self._interrupt_vk is not None else None
+        if trigger == "specific" and self._interrupt_vk is None:
+            logger.warning("⚠ 绑定按键无效，回退任意键中断")
+        self._stop_event = threading.Event()
+        self._interrupt_poll_active = True
+        self._was_interrupted = False
+        threading.Thread(target=self._interrupt_poll_loop, daemon=True).start()
 
     def _interrupt_poll_loop(self):
         """后台线程：Windows 低级键盘钩子 + GetAsyncKeyState 鼠标检测"""
@@ -870,8 +953,14 @@ class MainWindow:
             if getattr(self, '_hook_suspended', False):
                 return user32.CallNextHookEx(hook_id[0], nCode, wParam, lParam)
             if nCode >= 0 and wParam == WM_KEYDOWN:
-                self.root.after(0, self._do_interrupt)
-                return -1  # 吃掉这个按键
+                try:
+                    vk = lParam.contents.vkCode if lParam else None
+                except Exception:
+                    vk = None
+                # any 模式吞任意键；specific 只吞绑定键，其余放行
+                if self._interrupt_vk is None or vk == self._interrupt_vk:
+                    self.root.after(0, self._dispatch_interrupt, vk)
+                    return -1   # 吃掉触发键
             return user32.CallNextHookEx(hook_id[0], nCode, wParam, lParam)
 
         try:
@@ -897,12 +986,14 @@ class MainWindow:
                 # 鼠标检测
                 # 鼠标检测 —— bridge 模拟鼠标时跳过
                 if not getattr(self, '_hook_suspended', False):
-                    if user32.GetAsyncKeyState(0x01) & 0x8000:
-                        self.root.after(0, self._do_interrupt)
-                        break
-                    if user32.GetAsyncKeyState(0x02) & 0x8000:
-                        self.root.after(0, self._do_interrupt)
-                        break
+                    # 鼠标中断仅 any 模式生效（specific 只认绑定键）。
+                    # 不用 break：点弹窗/按钮的鼠标会触发轮询，break 会把钩子线程杀掉，
+                    # 导致 暂停→继续 后中断失效。钩子靠 _interrupt_poll_active 退出。
+                    if self._interrupt_vk is None:
+                        if user32.GetAsyncKeyState(0x01) & 0x8000:
+                            self.root.after(0, self._dispatch_interrupt)
+                        if user32.GetAsyncKeyState(0x02) & 0x8000:
+                            self.root.after(0, self._dispatch_interrupt)
                 # 泵消息
                 if user32.PeekMessageW(ctypes.byref(msg), 0, 0, 0, 1):
                     user32.TranslateMessage(ctypes.byref(msg))
@@ -921,28 +1012,32 @@ class MainWindow:
         """GetAsyncKeyState 轮询（钩子失败时的回退）"""
         import ctypes
         user32 = ctypes.windll.user32
-        for vk in range(0x08, 0xFF):
-            user32.GetAsyncKeyState(vk)
-        user32.GetAsyncKeyState(0x01)
-        user32.GetAsyncKeyState(0x02)
+        if self._interrupt_vk is None:
+            for vk in range(0x08, 0xFF):
+                user32.GetAsyncKeyState(vk)
         while self._interrupt_poll_active:
             hit = False
-            for vk in range(0x08, 0xFF):
-                if user32.GetAsyncKeyState(vk) & 0x8001:
-                    hit = True; break
-            if not hit:
-                m = user32.GetAsyncKeyState(0x01)
-                if m & 0x8001: hit = True
-                m = user32.GetAsyncKeyState(0x02)
-                if m & 0x8001: hit = True
+            if self._interrupt_vk is None:
+                for vk in range(0x08, 0xFF):
+                    if user32.GetAsyncKeyState(vk) & 0x8001:
+                        hit = True; break
+                if not hit:   # 鼠标：仅 any 模式
+                    m = user32.GetAsyncKeyState(0x01)
+                    if m & 0x8001: hit = True
+                    m = user32.GetAsyncKeyState(0x02)
+                    if m & 0x8001: hit = True
+            else:
+                if user32.GetAsyncKeyState(self._interrupt_vk) & 0x8001:
+                    hit = True
             if hit:
-                self.root.after(0, self._do_interrupt)
+                self.root.after(0, self._dispatch_interrupt, self._interrupt_vk)
                 return
             time.sleep(0.01)
 
     def _on_stop_send(self):
         if self._stop_event:
             self._stop_event.set()
+        self._was_interrupted = True   # ⏹ 终止 = 中断语义（修「发送完成」误标）
         self.send_progress.set_status("正在终止...")
         logger.info("用户请求终止")
 
@@ -991,9 +1086,9 @@ class MainWindow:
             self.send_progress.update_progress(current, total)
             self.send_progress.update_stats(succ, fail)
             if error:
-                self.send_progress.append_log(f"❌ {fname}: {error}")
+                logger.warning("❌ %s: %s", fname, error)
             else:
-                self.send_progress.append_log(f"✅ {fname}")
+                logger.info("✅ %s", fname)
             self.send_progress.set_status(f"发送中... {current}/{total}")
 
         elif msg_type == "__DONE__":
@@ -1002,6 +1097,8 @@ class MainWindow:
             self._interrupt_poll_active = False
             self._stop_event = None
             self._set_ui_sending(False)
+            self._paused = False
+            self.send_progress.set_paused(False)
             self.send_progress.set_status("发送完成" if not self._was_interrupted else "已中断")
             self.send_progress.update_progress(total, total)
             failed_names = [r.friend_name for r in failed_list]
@@ -1047,7 +1144,7 @@ class MainWindow:
                 selected = [names[i] for i in indices]
                 if selected and self._friend_service:
                     self._friend_service.import_names(selected)
-                    self.send_progress.append_log(f"已导入 {len(selected)} 个联系人")
+                    logger.info("✅ 已导入 %d 个联系人", len(selected))
                     self._apply_filter()
             dlg.set_on_confirm(_import_selected)
 
@@ -1060,28 +1157,31 @@ class MainWindow:
             self._interrupt_poll_active = False
             self._stop_event = None
             self._set_busy(False)
+            self._paused = False
+            self.send_progress.set_paused(False)
+            self.send_progress.set_terminate_available(False)
             self.send_progress.set_status("就绪")
             self.send_progress.set_running(False)
             self.friend_list.mark_failed(failed)
             self._apply_filter()
             self.root.lift()
             self.root.focus_force()
-            if not self._was_interrupted:
-                if not diffs:
-                    if failed:
-                        failed_count = len(failed)
-                        diff_count = len([n for n, r in failed.items() if "expected" in r])
-                        search_count = failed_count - diff_count
-                        messagebox.showinfo("检查完成",
-                            f"检查完成。\n"
-                            f"搜索失败: {search_count} 人\n"
-                            f"名字不完整: {diff_count} 人")
-                    else:
-                        messagebox.showinfo("检查完成", "全部名称完整，操作完成。")
+            # 有差异 → 始终弹 NameCheckDialog（含被中断/⏹ 终止时，展示已查到的部分结果）
+            if diffs:
+                from src.ui.name_check_dialog import NameCheckDialog
+                dialog = NameCheckDialog(self.root, diffs)
+                dialog.set_on_confirm(self._apply_name_fixes)
+            elif not self._was_interrupted:
+                if failed:
+                    failed_count = len(failed)
+                    diff_count = len([n for n, r in failed.items() if "expected" in r])
+                    search_count = failed_count - diff_count
+                    messagebox.showinfo("检查完成",
+                        f"检查完成。\n"
+                        f"搜索失败: {search_count} 人\n"
+                        f"名字不完整: {diff_count} 人")
                 else:
-                    from src.ui.name_check_dialog import NameCheckDialog
-                    dialog = NameCheckDialog(self.root, diffs)
-                    dialog.set_on_confirm(self._apply_name_fixes)
+                    messagebox.showinfo("检查完成", "全部名称完整，操作完成。")
 
     # ================================================================
     # 辅助
@@ -1093,12 +1193,12 @@ class MainWindow:
             return
         for old, new in fixes.items():
             self._friend_service.rename_friend(old, new)
-            logger.info("名字补全: '%s' → '%s'", old, new)
+            logger.info("✅ 名字补全: '%s' → '%s'", old, new)
         self._apply_filter()
 
     def _on_log_message(self, text: str):
-        if any(level in text for level in ("[INFO", "[WARNING", "[ERROR")):
-            self._progress_queue.put(("__LOG__", text))
+        """logger → UI 面板通道：_UIHandler 已按级别过滤并转成纯消息，这里直接转发"""
+        self._progress_queue.put(("__LOG__", text))
 
     def _show_startup_hints(self):
         """读取 startup.txt 并输出到日志窗口"""

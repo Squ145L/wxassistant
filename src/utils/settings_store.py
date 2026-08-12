@@ -48,6 +48,10 @@ DEFAULT_SETTINGS = {
     "op_key_press_delay": KEY_PRESS_DELAY,      # 组合键/鼠标事件间隔 (s)
     "op_send_interval": DEFAULT_SEND_INTERVAL,  # 两条消息之间基础间隔 (s)
     "op_send_jitter": INTERVAL_JITTER_RATIO,    # 发送间隔 ±抖动比例 (0~1)
+    # ---- 按键中断（设置→常规；仅发送 + 名字检查生效，扫描/导入固定终止）----
+    "interrupt_trigger": "any",      # 任意键 | specific（指定按键）
+    "interrupt_key": None,           # keysym 字符串，如 "F8"；仅 specific 时使用
+    "interrupt_mode": "terminate",   # terminate（终止）| pause（暂停）
 }
 
 # 账户级设置（每个账户独立，存在 账户文件夹/settings.json）

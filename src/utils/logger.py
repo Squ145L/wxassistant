@@ -18,6 +18,26 @@ def set_ui_callback(callback: Optional[Callable[[str], None]]):
     _ui_callback = callback
 
 
+class _UIMessageFormatter(logging.Formatter):
+    """面板格式：只显示纯消息，不显示 traceback（调试细节只进 cmd/文件）。
+
+    不能只 override formatException：文件/控制台 handler 先格式化同一条 record 时
+    已把 traceback 缓存进 record.exc_text，UI handler 后到会原样照抄。必须在
+    format 时临时清掉 exc_info（UI 是最后一个 handler，恢复与否无影响）。
+    """
+
+    def format(self, record):
+        # Formatter.format 的 `if record.exc_text:` 在 exc_info 判断之外，
+        # 只清 exc_info 没用（文件 handler 缓存的 exc_text 仍会被追加），两个都要清。
+        exc_info, record.exc_info = record.exc_info, None
+        exc_text, record.exc_text = record.exc_text, None
+        try:
+            return super().format(record)
+        finally:
+            record.exc_info = exc_info
+            record.exc_text = exc_text
+
+
 class _UIHandler(logging.Handler):
     """将日志转发到 UI 回调"""
 
@@ -42,8 +62,10 @@ def setup_logging(level: int = logging.DEBUG):
     root_logger.handlers.clear()
 
     formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+    # 面板只显示纯消息（规范 7.2-4），cmd/文件用完整格式
+    ui_formatter = _UIMessageFormatter(fmt="%(message)s")
 
-    # 文件 handler：按天轮转，保留 7 天
+    # 文件 handler：按天轮转，保留 7 天（完整格式，审计复盘）
     file_handler = TimedRotatingFileHandler(
         filename=LOG_FILE,
         when="midnight",
@@ -55,16 +77,16 @@ def setup_logging(level: int = logging.DEBUG):
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)
 
-    # 控制台 handler
+    # 控制台 handler：真正调试用，完整格式，DEBUG 全量（规范 7.1）
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    # UI handler（默认无回调，等 UI 注入）
+    # UI handler：给用户看，info+，只显示纯消息（默认无回调，等 UI 注入）
     ui_handler = _UIHandler()
     ui_handler.setLevel(logging.INFO)
-    ui_handler.setFormatter(formatter)
+    ui_handler.setFormatter(ui_formatter)
     root_logger.addHandler(ui_handler)
 
     # 抑制第三方库的 DEBUG 日志
