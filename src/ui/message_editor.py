@@ -94,13 +94,6 @@ class MessageEditor(ttk.Frame):
         )
         self._attach_listbox.pack(fill=tk.BOTH, expand=True, pady=(ui_kit.PAD_S, 0))
 
-        # === 选中计数 ===
-        self._selected_var = tk.StringVar(value="已选 0 人")
-        ttk.Label(
-            self, textvariable=self._selected_var,
-            foreground="gray", font=("", 9),
-        ).pack(anchor=tk.E, pady=(ui_kit.PAD_S, 0))
-
     # ================================================================
     # 公开接口
     # ================================================================
@@ -120,9 +113,6 @@ class MessageEditor(ttk.Frame):
         """消息基础间隔（设置→延迟，全局不分账户）"""
         from src.utils.settings_store import load_delay_settings
         return load_delay_settings()["op_send_interval"]
-
-    def set_selected_count(self, count: int):
-        self._selected_var.set(f"已选 {count} 人")
 
     def set_on_text_changed(self, callback: Callable[[], None]):
         self._on_text_changed = callback

@@ -289,7 +289,6 @@ class MainWindow:
 
         self.friend_list.set_friends(filtered)
         self.friend_list.set_match_count(len(filtered), len(all_friends))
-        self._sync_selected_count()
 
     def update_friend_list(self, friends: list, keyword: str = ""):
         self._apply_filter()
@@ -690,14 +689,10 @@ class MainWindow:
         frame.pack()
 
         msg = (
-            "OCR 菜单说明:\n\n"
-            "[OCR校准] 聊天界面标题 — 校准聊天标题栏位置\n"
-            "检查选中名称是否完整 — 搜索选中的好友并 OCR 比对\n"
-            "搜索并导入.. — 输入关键词搜索联系人\n"
-            "扫描通讯录并导入 — 打开通讯录管理，翻页 OCR 导入全部\n"
-            "[OCR校准] / [设置] — 校准/设置扫描通讯录功能\n\n"
-            "消息模板变量: [name]=好友名 [name2]=后两字\n"
-            "[$1][$2].. = 正则捕获组\n"
+            "消息模板变量: [name]=好友名\n"
+            "             [name2]=后两字\n"
+            "如：25级李华 [name]= 25级李华 \n"
+            "            [name2]= 李华 \n"
             "中断: 操作进行中按任意键或鼠标点击"
         )
         ttk.Label(frame, text=msg, font=("Microsoft YaHei", 10),
@@ -705,9 +700,6 @@ class MainWindow:
 
         btn_frame = ttk.Frame(frame)
         btn_frame.pack()
-        ttk.Button(btn_frame, text="打开文件夹",
-                   command=lambda: [self._open_project_dir(), dlg.destroy()]).pack(
-                       side=tk.LEFT, padx=(0, 12))
         ttk.Button(btn_frame, text="关闭", command=dlg.destroy).pack(side=tk.RIGHT)
 
         dlg.update_idletasks()
@@ -715,10 +707,6 @@ class MainWindow:
         px = self.root.winfo_rootx(); py = self.root.winfo_rooty()
         dw, dh = 420, 330
         dlg.geometry(f"{dw}x{dh}+{px + (pw - dw) // 2}+{py + (ph - dh) // 2}")
-
-    def _open_project_dir(self):
-        import os
-        os.startfile(str(Path(__file__).parent.parent.parent))
 
     def _on_import_settings_clicked(self):
         self._open_settings("OCR")
@@ -993,7 +981,6 @@ class MainWindow:
                     logger.exception("处理进度消息失败")
         except queue.Empty:
             pass
-        self._sync_selected_count()
         self.root.after(100, self._poll_progress_queue)
 
     def _handle_progress(self, msg: tuple):
@@ -1108,10 +1095,6 @@ class MainWindow:
             self._friend_service.rename_friend(old, new)
             logger.info("名字补全: '%s' → '%s'", old, new)
         self._apply_filter()
-
-    def _sync_selected_count(self):
-        count = self.friend_list.get_selected_count()
-        self.message_editor.set_selected_count(count)
 
     def _on_log_message(self, text: str):
         if any(level in text for level in ("[INFO", "[WARNING", "[ERROR")):

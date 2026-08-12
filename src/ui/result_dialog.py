@@ -18,6 +18,9 @@ class ResultDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
+        # 置顶：发送过程中最后激活的是微信窗口，主窗口已退到后台，
+        # 不置顶的话结果弹窗会被微信盖住看不到
+        self.attributes("-topmost", True)
 
         self._results: list = []          # list of (name, success, error)
         self._check_vars: list[tk.BooleanVar] = []
@@ -26,6 +29,8 @@ class ResultDialog(tk.Toplevel):
 
         self._build_ui()
         self._center_on_parent(parent)
+        self.lift()
+        self.focus_force()
 
     def set_tag_callback(self, callback: Callable[[str, str], bool]):
         """注入标签回调，参数为 (name, tag) -> bool"""

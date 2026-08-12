@@ -225,7 +225,7 @@ class SettingsDialog(tk.Toplevel):
         tab5 = ttk.Frame(nb, padding=16)
         nb.add(tab5, text="延迟")
 
-        ttk.Label(tab5, text="操作之间的延迟（所有账户共用，存 cache/settings.json）：",
+        ttk.Label(tab5, text="操作之间的延迟（所有账户共用）：",
                   font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W, pady=(0, 8))
 
         _row_delay(tab5, "窗口激活延迟 (s):", self._op_activate)
@@ -329,10 +329,7 @@ class SettingsDialog(tk.Toplevel):
             messagebox.showwarning(
                 "提示", f"来源账户「{source}」没有已保存的坐标/OCR 校准，无内容可复制。")
             return
-        parts = [p for p, ok in (("坐标", copied_coords), ("OCR 校准", copied_calib)) if ok]
-        messagebox.showinfo(
-            "已同步",
-            f"已从「{source}」同步 {'、'.join(parts)} 到当前账户。\n之后各自独立，不再跟随。")
+        messagebox.showinfo("已同步", f"已从{source}同步坐标和OCR校准 到当前账户")
         self._refresh_coord_vars_from_disk()
 
     def _pick_inherit_source(self, others: list[str]) -> Optional[str]:

@@ -49,11 +49,20 @@ class TemplateEngine:
         logger.debug("模板渲染: '%s' → '%s'", template[:40], result[:40])
         return result
 
+    # 有效变量：内置 [name] [name2] + 正则捕获组 [$1]..[$N]（N>=1）；其余 [xxx] 按普通文本，不检测
+    _VALID_NAMED = ("name", "name2")
+
     @staticmethod
     def validate(template: str) -> list[str]:
-        """返回模板中使用的变量列表"""
-        vars_found = re.findall(r"\[(\$?\w+)\]", template)
-        return list(dict.fromkeys(vars_found))
+        """返回模板中使用的**有效**变量列表（无效的 [xxx] 不检测）"""
+        found: list[str] = []
+        for m in re.finditer(r"\[(\$?\w+)\]", template):
+            var = m.group(1)
+            is_named = var in TemplateEngine._VALID_NAMED
+            is_group = var.startswith("$") and var[1:].isdigit() and int(var[1:]) >= 1
+            if (is_named or is_group) and var not in found:
+                found.append(var)
+        return found
 
     @staticmethod
     def get_help_text() -> str:

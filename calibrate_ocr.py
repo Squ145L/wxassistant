@@ -43,6 +43,36 @@ OCR_HELP_IMAGES = {
 }
 
 
+def _center_window(root: tk.Tk, w: int, h: int) -> None:
+    """把窗口居中到屏幕（之前靠 WM 默认摆放，位置不定）"""
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    x = max(0, (sw - w) // 2)
+    y = max(0, (sh - h) // 2)
+    root.geometry(f"{w}x{h}+{x}+{y}")
+
+
+def _place_beside(win: tk.Toplevel, anchor: tk.Widget, gap: int = 8) -> None:
+    """把 win 放到 anchor 窗口右侧（屏幕放不下则左侧），垂直居中，避免重叠"""
+    anchor.update_idletasks()
+    win.update_idletasks()
+    ax = anchor.winfo_rootx()
+    ay = anchor.winfo_rooty()
+    aw = anchor.winfo_width()
+    ah = anchor.winfo_height()
+    tw = win.winfo_reqwidth()
+    th = win.winfo_reqheight()
+    sw = win.winfo_screenwidth()
+    sh = win.winfo_screenheight()
+    x = ax + aw + gap
+    if x + tw > sw:
+        x = ax - tw - gap          # 右侧放不下 → 放到左侧
+    x = max(0, min(x, sw - tw))
+    y = ay + (ah - th) // 2
+    y = max(0, min(y, sh - th))
+    win.geometry(f"+{x}+{y}")
+
+
 def _show_help_thumbnail(root: tk.Tk, key: str, desc: str):
     """显示 OCR 校准参考缩略图（与坐标校准 ThumbnailWindow 同款）。图缺失时返回 None。"""
     img_path = HELP_DIR / OCR_HELP_IMAGES.get(key, "")
@@ -58,6 +88,8 @@ def _show_help_thumbnail(root: tk.Tk, key: str, desc: str):
         photo = ImageTk.PhotoImage(img)
         tk.Label(thumb, image=photo).pack(padx=8, pady=8)
         thumb._photo = photo  # 防 GC
+        # 放到校准窗口右侧，避免与校准窗口重叠（放不下则左侧）
+        _place_beside(thumb, root)
         return thumb
     except Exception:
         return None
@@ -150,9 +182,9 @@ def main():
 
     root = tk.Tk()
     root.title(f"校准: {desc} — 拖拽绿色矩形框选 | 保存后关闭")
-    root.geometry(f"900x680")
     root.minsize(400, 300)
     root.configure(bg="#f0f0f0")
+    _center_window(root, 900, 680)   # 校准窗口居中到屏幕
 
     # ---- 底部栏 ----
     bar = tk.Frame(root, height=BAR_H, bg="#f0f0f0")

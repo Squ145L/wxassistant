@@ -1,6 +1,7 @@
 """好友列表面板 — 顶部筛选行（搜索/正则/标签）+ Treeview + 底部操作行（全选/反选/删除）"""
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, simpledialog, messagebox
 from typing import Callable, Optional
 
@@ -141,18 +142,23 @@ class FriendList(ttk.Frame):
         tree_frame = ttk.Frame(self)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
+        # 行高 28px：容纳字体上下留白 + 内联重命名框完整放进行内，不遮挡相邻行
+        ttk.Style(self).configure("FriendList.Treeview", rowheight=28)
         self._tree = ttk.Treeview(
             tree_frame,
             columns=("cb", "name", "tag"),
             show="headings",
             selectmode="none",
+            style="FriendList.Treeview",
         )
         self._tree.heading("cb", text="")
-        self._tree.heading("name", text="名称")
-        self._tree.heading("tag", text="标签")
-        self._tree.column("cb", width=24, anchor=tk.CENTER, stretch=False)
+        self._tree.heading("name", text="名称", anchor=tk.W)   # 标题贴左，不居中
+        self._tree.heading("tag", text="标签", anchor=tk.W)
+        # cb 列留足宽度，保证 ☑/☐ 打勾图标完整显示
+        self._tree.column("cb", width=40, anchor=tk.CENTER, stretch=False)
         self._tree.column("name", width=200, anchor=tk.W)
-        self._tree.column("tag", width=80, anchor=tk.W)
+        # 标签列固定宽度（约 8 个汉字容量），不参与拉伸（Treeview 等额分配多余空间会把标签拉宽）
+        self._tree.column("tag", width=120, anchor=tk.W, stretch=False)
 
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self._tree.yview)
         self._tree.configure(yscrollcommand=scrollbar.set)
@@ -485,7 +491,10 @@ class FriendList(ttk.Frame):
         entry = tk.Entry(self._tree, font=("Microsoft YaHei", 10))
         entry.insert(0, old)
         entry.select_range(0, tk.END)
-        entry.place(x=x, y=y, width=w, height=h)
+        # 行高(20px) < 字体需要的上下留白高度(≈25px) → 按字体高度放置并垂直居中，避免文字上下被遮
+        font = tkfont.Font(family="Microsoft YaHei", size=10)
+        need_h = max(h, font.metrics("linespace") + 6)
+        entry.place(x=x, y=y + (h - need_h) // 2, width=w, height=need_h)
         entry.focus_set()
 
         self._rename_entry = entry
