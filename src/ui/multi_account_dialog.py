@@ -25,7 +25,8 @@ class MultiOpenWizard:
 
         self.root.title("多开设置")
         self.root.geometry("480x440")
-        self.root.minsize(400, 320)
+        # 最小高度 440：固定内容 + tree 8 行 + 边距，低于此高度按钮会塌
+        self.root.minsize(400, 440)
         # 屏幕居中（主窗口已销毁，无父窗口可相对）
         self.root.update_idletasks()
         _w, _h = 480, 440
@@ -60,26 +61,31 @@ class MultiOpenWizard:
         cols = ("order", "name", "hwnd")
         self._tree = ttk.Treeview(tree_frame, columns=cols, show="headings", height=8)
         self._tree.heading("order", text="顺序")
-        self._tree.heading("name", text="账户名")
-        self._tree.heading("hwnd", text="窗口句柄")
+        self._tree.heading("name", text="账户名", anchor=tk.W)
+        self._tree.heading("hwnd", text="窗口句柄", anchor=tk.W)
         self._tree.column("order", width=50, anchor=tk.CENTER)
-        self._tree.column("name", width=170)
-        self._tree.column("hwnd", width=110)
+        self._tree.column("name", width=170, anchor=tk.W)
+        self._tree.column("hwnd", width=110, anchor=tk.W)
         self._tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self._tree.yview)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         self._tree.configure(yscrollcommand=sb.set)
 
-        # 底部操作栏（用 grid 而非 pack：pack 混用 side=BOTTOM + expand 会让右侧按钮塌成 1px）
-        # 左：②逐个确认账户/重命名/删除；右：取消/确定并进入多开；col3 弹性区吸收多余空间
+        # 操作行（grid：与底部按钮行一致，避免 pack 塌缩）
+        ops = ttk.Frame(self.root)
+        ops.pack(fill=tk.X, **pad)
+        ops.columnconfigure(3, weight=1)
+        ttk.Button(ops, text="② 逐个确认账户", command=self._on_confirm_all).grid(row=0, column=0, sticky="w")
+        ttk.Button(ops, text="重命名", command=self._on_rename).grid(row=0, column=1, padx=(4, 0))
+        ttk.Button(ops, text="删除", command=self._on_delete).grid(row=0, column=2, sticky="w")
+
+        # 底部按钮（grid：避免 pack 混用 side=BOTTOM 让右侧按钮塌成 1px 的 bug）
+        # 本行仅两个按钮（~180px），任何窗口宽度都放得下；col0 弹性区吸收多余空间
         btns = ttk.Frame(self.root)
         btns.pack(fill=tk.X, side=tk.BOTTOM, **pad)
-        btns.columnconfigure(3, weight=1)
-        ttk.Button(btns, text="② 逐个确认账户", command=self._on_confirm_all).grid(row=0, column=0, sticky="w")
-        ttk.Button(btns, text="重命名", command=self._on_rename).grid(row=0, column=1, padx=(4, 0))
-        ttk.Button(btns, text="删除", command=self._on_delete).grid(row=0, column=2, sticky="w")
-        ttk.Button(btns, text="取消", command=self._on_cancel).grid(row=0, column=4, sticky="e")
-        ttk.Button(btns, text="确定并进入多开", command=self._on_ok).grid(row=0, column=5, padx=(6, 0), sticky="e")
+        btns.columnconfigure(0, weight=1)
+        ttk.Button(btns, text="取消", command=self._on_cancel).grid(row=0, column=1, sticky="e")
+        ttk.Button(btns, text="确定并进入多开", command=self._on_ok).grid(row=0, column=2, padx=(6, 0), sticky="e")
 
     # ---- 检测 ----
     def _on_detect(self):
