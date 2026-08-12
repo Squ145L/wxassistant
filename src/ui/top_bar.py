@@ -12,6 +12,9 @@ from typing import Callable, Optional
 
 from src.ui import ui_kit
 
+# 账户下拉末尾的哨兵项：选中它 = 触发「新建账户」而非切换账户
+ADD_ACCOUNT_LABEL = "➕ 添加账户…"
+
 
 class TopBar(ttk.Frame):
     """主窗口顶栏"""
@@ -19,6 +22,7 @@ class TopBar(ttk.Frame):
     def __init__(self, parent: tk.Widget):
         super().__init__(parent, padding=(4, 4))
         self._on_account_change: Optional[Callable[[str], None]] = None
+        self._on_add_account: Optional[Callable[[], None]] = None
         self._on_check_names: Optional[Callable[[], None]] = None
         self._on_export: Optional[Callable[[str], None]] = None   # fmt: txt/csv/json
         self._on_import_all: Optional[Callable[[], None]] = None
@@ -105,7 +109,7 @@ class TopBar(ttk.Frame):
         self._multi = bool(names)
         if names:
             self._account_combo.config(state="readonly")
-            self._account_combo["values"] = list(names)
+            self._account_combo["values"] = list(names) + [ADD_ACCOUNT_LABEL]
             if account_var is not None:
                 self._account_combo.configure(textvariable=account_var)
                 if not account_var.get():
@@ -118,8 +122,14 @@ class TopBar(ttk.Frame):
             self._account_combo["values"] = []
 
     def _on_combo_selected(self, _event=None) -> None:
+        selected = self._account_combo.get()
+        if selected == ADD_ACCOUNT_LABEL:
+            # 哨兵项：触发新建账户（显示恢复由 MainWindow 处理），不切换账户
+            if self._on_add_account:
+                self._on_add_account()
+            return
         if self._on_account_change:
-            self._on_account_change(self._account_combo.get())
+            self._on_account_change(selected)
 
     def _toggle_menu(self, btn: ttk.Widget, menu: tk.Menu) -> str:
         """[联系人]/[标签] 点击：弹出菜单（tk_popup 阻塞式）
@@ -159,6 +169,7 @@ class TopBar(ttk.Frame):
 
     # ---- 回调注入 ----
     def set_on_account_change(self, cb): self._on_account_change = cb
+    def set_on_add_account(self, cb): self._on_add_account = cb
     def set_on_check_names(self, cb): self._on_check_names = cb
     def set_on_export(self, cb): self._on_export = cb
     def set_on_import_all(self, cb): self._on_import_all = cb

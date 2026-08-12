@@ -6,9 +6,12 @@
 """
 import json
 import logging
+import shutil
 from pathlib import Path
 
-from src.utils.account_paths import account_settings_path_for
+from src.utils.account_paths import (
+    account_settings_path_for, coordinates_path_for, calibration_path_for,
+)
 from src.utils.config import (
     ACTIVATE_DELAY, SEARCH_DELAY, CLIPBOARD_DELAY, PASTE_DELAY,
     SEND_AFTER_DELAY, FILE_SEND_DELAY, KEY_PRESS_DELAY,
@@ -119,3 +122,27 @@ def save_account_settings(account_name: str, settings: dict) -> None:
         json.dumps(settings, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def copy_account_data(source: str, target: str) -> tuple[bool, bool]:
+    """把来源账户的坐标 + OCR 校准文件单次复制到目标账户（之后不跟随）
+
+    仅当来源账户已保存过对应文件时才复制；未保存过的项跳过。
+    Returns: (coordinates_copied, calibration_copied)
+    """
+    if not source or not target:
+        return (False, False)
+    copied_coords = copied_calib = False
+    src_coords = coordinates_path_for(source)
+    if src_coords.exists():
+        dst = coordinates_path_for(target)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src_coords, dst)
+        copied_coords = True
+    src_calib = calibration_path_for(source)
+    if src_calib.exists():
+        dst = calibration_path_for(target)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src_calib, dst)
+        copied_calib = True
+    return (copied_coords, copied_calib)
